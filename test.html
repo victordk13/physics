@@ -10,10 +10,8 @@
       margin: 0px;
       overflow: hidden;
     }
-    </style>
-  </head>
-  <body>
-    <canvas id="testCanvas">Your browser doesn't support "canvas".</canvas>
+</style>
+	 
     <script>
 var canvas;
 var stage;
@@ -89,6 +87,15 @@ function toggleCache(value) {
 		}
 	}
 }
-    </script>
+    </script>	
+  </head>
+  <body onload="init();">
+	 <div class="controls">
+	<input type="checkbox" onClick="toggleCache(this.checked);"
+		   id="toggleCache"/><label for="toggleCache">cache
+	enabled</label>
+</div>
+    <canvas id="testCanvas">Your browser doesn't support "canvas".</canvas>
+
   </body>
 </html>

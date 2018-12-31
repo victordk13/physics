@@ -31,7 +31,7 @@ var diss = 0.001;
 var vlength = [0, 0];
 
 function calcVlength() {
-    var size = min(canvas.width, canvas.height) / 3;
+    var size = Math.min(canvas.width, canvas.height) / 3;
     vlength[0] = l[0] * size / (l[0] + l[1]);
     vlength[1] = l[1] * size / (l[0] + l[1]);
 }

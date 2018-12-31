@@ -2,6 +2,7 @@
   <head>
     <meta charset="UTF-8">
     <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
+    <script src="math.min.js"></script>
     <style>
     html, body {
       width:  100%;
@@ -19,81 +20,139 @@ var shape;
 var radius = 50;
 var rings = 40;
 
+var g  = 9.8;      // m/s^2
+var m  = [1., 1.]; // only proportion matters
+var l  = [.1, .1]; // also in m, and make it life-sized for better effect
+var th = [1., 1.]; // in radians
+var th_spd = [0., 0.];
+var th_acc; // to solve for
+var diss = 0.001;
+
+var vlength = [0, 0];
+
+function calcVlength() {
+    var size = min(canvas.width, canvas.height) / 3;
+    vlength[0] = l[0] * size / (l[0] + l[1]);
+    vlength[1] = l[1] * size / (l[0] + l[1]);
+}
+
 function init() {
-	// create a new stage and point it at our canvas:
-	canvas = document.getElementById("testCanvas");
-	stage = new createjs.Stage(canvas);
+    // create a new stage and point it at our canvas:
+    canvas = document.getElementById("testCanvas");
+    stage = new createjs.Stage(canvas);
+    
+    calcVlength();
 
-	// create a large number of slightly complex vector shapes, and give them random positions and velocities:
+    for (var i = 0; i < 2; i++) {
+        shape = new createjs.Shape();
+        shape.graphics
+            .setStrokeStyle(2)
+            .beginFill("#FFF")
+            .beginStroke("#222")
+            .drawRoundRect(0, 0, 20, vlength[i] + 20, 5)
+            .drawCircle(10, 10, 2);
 
-	var colors = ["#828b20", "#b0ac31", "#cbc53d", "#fad779", "#f9e4ad", "#faf2db", "#563512", "#9b4a0b", "#d36600", "#fe8a00", "#f9a71f"];
+        shape.regX = shape.regY = 10;
+        shape.x = canvas.width / 2;
+        shape.y = canvas.height / 2;
+        //shape.velX = Math.random() * 10 - 5;
+        //shape.velY = Math.random() * 10 - 5;
 
-	for (var i = 0; i < 200; i++) {
-		shape = new createjs.Shape();
-		for (var j = rings; j > 0; j--) {
-			shape.graphics.beginFill(colors[Math.random() * colors.length | 0]).drawCircle(0, 0, radius * j / rings);
-		}
-		shape.x = Math.random() * canvas.width;
-		shape.y = Math.random() * canvas.height;
-		shape.velX = Math.random() * 10 - 5;
-		shape.velY = Math.random() * 10 - 5;
+        // turn snapToPixel on for all shapes - it's set to false by default on Shape.
+        // it won't do anything until stage.snapToPixelEnabled is set to true.
+        // shape.snapToPixel = true;
 
-		// turn snapToPixel on for all shapes - it's set to false by default on Shape.
-		// it won't do anything until stage.snapToPixelEnabled is set to true.
-		shape.snapToPixel = true;
+        stage.addChild(shape);
+    }
 
-		stage.addChild(shape);
-	}
+    // add a text object to output the current FPS:
+    fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#000");
+    stage.addChild(fpsLabel);
+    fpsLabel.x = 10;
+    fpsLabel.y = 20;
 
-	// add a text object to output the current FPS:
-	fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#FFF");
-	stage.addChild(fpsLabel);
-	fpsLabel.x = 10;
-	fpsLabel.y = 20;
+    // start the tick and point it at the window so we can do some work before updating the stage:
+    createjs.Ticker.timingMode = createjs.Ticker.RAF;
+    createjs.Ticker.addEventListener("tick", tick);
+}
 
-	// start the tick and point it at the window so we can do some work before updating the stage:
-	createjs.Ticker.timingMode = createjs.Ticker.RAF;
-	createjs.Ticker.addEventListener("tick", tick);
+// https://www.wolframalpha.com/input/?i=double+pendulum see Equations of motion
+function solve() {
+    // calculate concrete values of equation    
+    A = [ 
+        [(m[0] + m[1]) * l[0], m[1] * l[1] * Math.cos(th[0] - th[1])],
+        [l[1], l[0] * Math.cos(th[0] - th[1])]
+    ];
+    b = [
+        - m[1] * l[1] * th_spd[1]^2 * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
+        l[0] * th_spd[0]^2 * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
+    ];
+    // solve for angular acceleration
+    th_acc = math.lusolve(A, b);
+}
+
+function step(time) {
+    var old_spd = th_spd;
+    // don't update speeds if solution is invalid
+    if (Array.isArray(th_acc) && !isNaN(th_acc[0]) && !isNaN(th_acc[0]))
+    {
+        th_spd[0] += th_acc[0] * time;
+        th_spd[1] += th_acc[1] * time;
+    }
+    //th_spd[0] *= (1 - diss * time);
+    th[0] += (old_spd[0] + th_spd[0]) * time / 2;
+    th[1] += (old_spd[1] + th_spd[1]) * time / 2;
+}
+
+function draw() {
+    calcVlength();
+    var x = canvas.width / 2;
+    var y = canvas.height / 2;
+    for (var i = 0; i < 2; i++) {
+        var shape = stage.getChildAt(i);
+        shape.x = x;
+        shape.y = y;
+        shape.rotation = th[i] * 180 / Math.PI;
+        
+        x += vlength[i] * Math.sin(th[i]);
+        y += vlength[i] * Math.cos(th[i]);
+    }
 }
 
 function tick(event) {
-	var w = canvas.width + radius * 2;
-	var h = canvas.height + radius * 2;
-	var l = stage.numChildren - 1;
+    
+    solve();
+        
+    step(1. / createjs.Ticker.getMeasuredFPS());
+    
+    draw();
+    
+    fpsLabel.text = Math.round(createjs.Ticker.getMeasuredFPS()) + " fps";
 
-	// iterate through all the children and move them according to their velocity:
-	for (var i = 1; i < l; i++) {
-		var shape = stage.getChildAt(i);
-		shape.x = (shape.x + radius + shape.velX + w) % w - radius;
-		shape.y = (shape.y + radius + shape.velY + h) % h - radius;
-	}
-
-	fpsLabel.text = Math.round(createjs.Ticker.getMeasuredFPS()) + " fps";
-
-	// draw the updates to stage:
-	stage.update(event);
+    // draw the updates to stage:
+    stage.update(event);
 }
 
 function toggleCache(value) {
-	// iterate all the children except the fpsLabel, and set up the cache:
-	var l = stage.numChildren - 1;
+    // iterate all the children except the fpsLabel, and set up the cache:
+    var l = stage.numChildren - 1;
 
-	for (var i = 0; i < l; i++) {
-		var shape = stage.getChildAt(i);
-		if (value) {
-			shape.cache(-radius, -radius, radius * 2, radius * 2);
-		} else {
-			shape.uncache();
-		}
-	}
+    for (var i = 0; i < l; i++) {
+        var shape = stage.getChildAt(i);
+        if (value) {
+            shape.cache(-radius, -radius, radius * 2, radius * 2);
+        } else {
+            shape.uncache();
+        }
+    }
 }
-    </script>	
+    </script>   
   </head>
   <body onload="init();">
     <div class="controls">
       <input type="checkbox" onClick="toggleCache(this.checked);" id="toggleCache"/>
       <label for="toggleCache">cache enabled</label>
     </div>
-    <canvas id="testCanvas" width="1280" height="720">Your browser doesn't support "canvas".</canvas>
+    <canvas id="testCanvas" width="720" height="720">Your browser doesn't support "canvas".</canvas>
   </body>
 </html>

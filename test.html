@@ -20,17 +20,17 @@ var shape;
 
 var g       = 9.8;      // m/s^2
 var m       = [1., 1.]; // only proportion matters
-var l       = [1., 1.]; // also in m, and make it life-sized for better effect
-var th      = [1., 1.]; // in radians
+var l       = [1., 1.5]; // also in m, and make it life-sized for better effect
+var th      = [1.5, 1.5]; // in radians
 var th_spd  = [0., 0.];
 var p       = [0,0];
 var p_spd   = [0,0];
 //var th_acc; // to solve for
-var diss    = 0.01;
+var diss    = 0.0;
 
 var vlength = [0, 0];
 
-var A, b, L;
+var A, b, E;
 var div, C1, C2, cdiff, sdiff; // TODEL
 
 function calcVlength() {
@@ -54,7 +54,7 @@ function Lagrangian() {
   return LK() - LP();
 }
 
-function E() {
+function Energy() {
   return LK() + LP();
 }
 
@@ -94,12 +94,16 @@ function stepViaHamiltonian(dur) {
   th_spd[0] *= (1 - diss * dur); // friction
   th_spd[1] *= (1 - diss * dur);
   
+  E -= LK() * diss * dur;
+  
   th[0] += th_spd[0] * dur;
   th[1] += th_spd[1] * dur;
+  
+  normalize();
 }
 
 function init() {
-    //L = Lagrangian();
+    E = Energy();
     solveViaHamiltonian();
 
     // create a new stage and point it at our canvas:
@@ -160,8 +164,8 @@ function normalize() {
   // computation errors will accumulate so we need at least keep total L constant
   var lk = LK();
   var lp = LP();
-  if (lp <= L) {
-    var mul = Math.sqrt((L - lp) / lk);
+  if (lp <= E) {
+    var mul = Math.sqrt((E - lp) / lk);
     th_spd[0] *= mul;
     th_spd[1] *= mul;
   }
@@ -214,7 +218,7 @@ function tick(event) {
     }
     draw();
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + E();
+    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + Math.round(Energy()*100)/100;
 
     // draw the updates to stage:
     stage.update(event);

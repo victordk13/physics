@@ -18,17 +18,20 @@ var canvas;
 var stage;
 var shape;
 
-var g  = 9.8;      // m/s^2
-var m  = [1., 1.]; // only proportion matters
-var l  = [1., 1.]; // also in m, and make it life-sized for better effect
-var th = [1.5, 1.5]; // in radians
-var th_spd = [0., 0.];
-var th_acc; // to solve for
-var diss = 0.001;
+var g       = 9.8;      // m/s^2
+var m       = [1., 1.]; // only proportion matters
+var l       = [1., 1.]; // also in m, and make it life-sized for better effect
+var th      = [1., 1.]; // in radians
+var th_spd  = [0., 0.];
+var p       = [0,0];
+var p_spd   = [0,0];
+//var th_acc; // to solve for
+var diss    = 0.01;
 
 var vlength = [0, 0];
 
 var A, b, L;
+var div, C1, C2, cdiff, sdiff; // TODEL
 
 function calcVlength() {
     var size = Math.min(canvas.width, canvas.height) / 3;
@@ -37,23 +40,67 @@ function calcVlength() {
 }
 
 function LK() {
-  return 1/2 * (m[0] + m[1]) * Math.pow(l[0], 2) * Math.pow(th_spd[0], 2) 
-    + 1/2 * m[1] * Math.pow(l[1], 2) * Math.pow(th_spd[1], 2) 
+  return 1/2 * (m[0] + m[1]) * l[0] * l[0] * th_spd[0] * th_spd[0] 
+    + 1/2 * m[1] * l[1] * l[1] * th_spd[1] * th_spd[1] 
     + m[1] * l[0] * l[1] * th_spd[0] * th_spd[1] * Math.cos(th[0] - th[1]);
 }
 
 function LP() {
-  return (m[0] + m[1]) * g * l[0] * Math.cos(th[0]) 
-    + m[1] * g * l[1] * Math.cos(th[1]);
+  return - (m[0] + m[1]) * g * l[0] * Math.cos(th[0]) 
+    - m[1] * g * l[1] * Math.cos(th[1]);
 }
 
 function Lagrangian() {
+  return LK() - LP();
+}
+
+function E() {
   return LK() + LP();
 }
 
+function solveViaHamiltonian() {
+  cdiff = Math.cos(th[0] - th[1]);
+  sdiff = Math.sin(th[0] - th[1]);
+
+  // 1 & 2 must be opposite, so one of them is useless, but we need p_spd to update p
+  // and th_spd is how we move the pendulums
+  p[0] = (m[0]+m[1]) * l[0] * l[0] * th_spd[0]
+    +          m[1]  * l[0] * l[1] * th_spd[1] * cdiff;
+  p[1] =       m[1]  * l[1] * l[1] * th_spd[1] 
+    +          m[1]  * l[0] * l[1] * th_spd[0] * cdiff;
+  
+  div = l[0] * l[1] * (m[0] + m[1] * sdiff * sdiff);
+  
+  C1 = p[0] * p[1] * sdiff / div;
+  C2 = (l[1] * l[1] * m[1] * p[0] * p[0] + l[0] * l[0] * (m[0] + m[1]) * p[1] * p[1]
+    - 2 * l[0] * l[1] * m[1] * p[0] * p[1] * cdiff) * Math.sin(2 * (th[0] - th[1]))
+    / 2 / m[1] / div / div;
+    
+  p_spd[0] = - (m[0]+m[1]) * g * l[0] * Math.sin(th[0]) - C1 + C2;
+  p_spd[1] = -       m[1]  * g * l[1] * Math.sin(th[1]) + C1 - C2;
+
+}
+
+function stepViaHamiltonian(dur) {
+  // update p? update th?
+  p[0] += p_spd[0] * dur;
+  p[1] += p_spd[1] * dur;
+  
+  var div = l[0] * l[1] * (m[0] + m[1] * sdiff * sdiff);
+  // 2
+  th_spd[0] = (l[1] * p[0] - l[0] * p[1] * cdiff) / l[0] / div;
+  th_spd[1] = ((m[0]+m[1]) * l[0] * p[1] - m[1] * l[1] * p[0] * cdiff) / l[1] / m[1] / div;  
+
+  th_spd[0] *= (1 - diss * dur); // friction
+  th_spd[1] *= (1 - diss * dur);
+  
+  th[0] += th_spd[0] * dur;
+  th[1] += th_spd[1] * dur;
+}
+
 function init() {
-    L = Lagrangian();
-    solve();
+    //L = Lagrangian();
+    solveViaHamiltonian();
 
     // create a new stage and point it at our canvas:
     canvas = document.getElementById("testCanvas");
@@ -94,16 +141,16 @@ function init() {
     createjs.Ticker.addEventListener("tick", tick);
 }
 
-// https://www.wolframalpha.com/input/?i=double+pendulum see Equations of motion
+// http://scienceworld.wolfram.com/physics/DoublePendulum.html
 function solve() {
-    // calculate concrete values of equation    
+    // calculate concrete values of equation
     A = [ 
         [(m[0] + m[1]) * l[0], m[1] * l[1] * Math.cos(th[0] - th[1])],
         [l[1], l[0] * Math.cos(th[0] - th[1])]
     ];
     b = [
-        - m[1] * l[1] * Math.pow(th_spd[1], 2) * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
-        l[0] * Math.pow(th_spd[0], 2) * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
+        - m[1] * l[1] * th_spd[1] * th_spd[1] * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
+        l[0] * th_spd[0] * th_spd[0] * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
     ];
     // solve for angular acceleration
     th_acc = math.lusolve(A, b);
@@ -133,11 +180,11 @@ function step(time) {
           th_spd[1] += th_acc[1] * time;
         }
     }
-    //th_spd[0] *= (1 - diss * time);
+    //th_spd[0] *= (1 - diss * time); // friction
     th[0] += (old_spd[0] + th_spd[0]) * time / 2;
     th[1] += (old_spd[1] + th_spd[1]) * time / 2;
     
-    normalize();
+    //normalize(); // constant energy
 }
 
 function draw() {
@@ -155,20 +202,19 @@ function draw() {
     }
 }
 
-function tick(event) {
+function tick(event) {    
+    dur = 1. / createjs.Ticker.getMeasuredFPS();
+    step = 0.005;
     
-    solve();
+    for (var t = 0; t < dur; t += step)
+    {
+      solveViaHamiltonian();
     
-    fps = createjs.Ticker.getMeasuredFPS();
-    
-    if (fps < 10)
-      return;
-        
-    step(1. / createjs.Ticker.getMeasuredFPS());
-    
+      stepViaHamiltonian(dur > t + step ? step : dur - t);
+    }
     draw();
     
-    fpsLabel.text = Math.round(createjs.Ticker.getMeasuredFPS()) + " fps";
+    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + E();
 
     // draw the updates to stage:
     stage.update(event);

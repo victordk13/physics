@@ -2,7 +2,7 @@
   <head>
     <meta charset="UTF-8">
     <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
-    <script src="math.min.js"></script>
+    <script src="https://victordk13.github.io/physics_test/math.min.js"></script>
     <style>
     html, body {
       width:  100%;
@@ -17,18 +17,18 @@
 var canvas;
 var stage;
 var shape;
-var radius = 50;
-var rings = 40;
 
 var g  = 9.8;      // m/s^2
 var m  = [1., 1.]; // only proportion matters
-var l  = [.1, .1]; // also in m, and make it life-sized for better effect
-var th = [1., 1.]; // in radians
+var l  = [1., 1.]; // also in m, and make it life-sized for better effect
+var th = [1.5, 1.5]; // in radians
 var th_spd = [0., 0.];
 var th_acc; // to solve for
 var diss = 0.001;
 
 var vlength = [0, 0];
+
+var A, b, L;
 
 function calcVlength() {
     var size = Math.min(canvas.width, canvas.height) / 3;
@@ -36,13 +36,30 @@ function calcVlength() {
     vlength[1] = l[1] * size / (l[0] + l[1]);
 }
 
+function LK() {
+  return 1/2 * (m[0] + m[1]) * Math.pow(l[0], 2) * Math.pow(th_spd[0], 2) 
+    + 1/2 * m[1] * Math.pow(l[1], 2) * Math.pow(th_spd[1], 2) 
+    + m[1] * l[0] * l[1] * th_spd[0] * th_spd[1] * Math.cos(th[0] - th[1]);
+}
+
+function LP() {
+  return (m[0] + m[1]) * g * l[0] * Math.cos(th[0]) 
+    + m[1] * g * l[1] * Math.cos(th[1]);
+}
+
+function Lagrangian() {
+  return LK() + LP();
+}
+
 function init() {
+    L = Lagrangian();
+    solve();
+
     // create a new stage and point it at our canvas:
     canvas = document.getElementById("testCanvas");
     stage = new createjs.Stage(canvas);
     
     calcVlength();
-
     for (var i = 0; i < 2; i++) {
         shape = new createjs.Shape();
         shape.graphics
@@ -50,6 +67,7 @@ function init() {
             .beginFill("#FFF")
             .beginStroke("#222")
             .drawRoundRect(0, 0, 20, vlength[i] + 20, 5)
+            .moveTo(10, 10)
             .drawCircle(10, 10, 2);
 
         shape.regX = shape.regY = 10;
@@ -84,24 +102,42 @@ function solve() {
         [l[1], l[0] * Math.cos(th[0] - th[1])]
     ];
     b = [
-        - m[1] * l[1] * th_spd[1]^2 * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
-        l[0] * th_spd[0]^2 * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
+        - m[1] * l[1] * Math.pow(th_spd[1], 2) * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
+        l[0] * Math.pow(th_spd[0], 2) * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
     ];
     // solve for angular acceleration
     th_acc = math.lusolve(A, b);
 }
 
+function normalize() {
+  // computation errors will accumulate so we need at least keep total L constant
+  var lk = LK();
+  var lp = LP();
+  if (lp <= L) {
+    var mul = Math.sqrt((L - lp) / lk);
+    th_spd[0] *= mul;
+    th_spd[1] *= mul;
+  }
+  // else lk should be negative; we are fucked, let's do nothing
+}
+
 function step(time) {
     var old_spd = th_spd;
     // don't update speeds if solution is invalid
-    if (Array.isArray(th_acc) && !isNaN(th_acc[0]) && !isNaN(th_acc[0]))
+    if (Array.isArray(th_acc) && isFinite(th_acc[0]) && isFinite(th_acc[0]))
     {
-        th_spd[0] += th_acc[0] * time;
-        th_spd[1] += th_acc[1] * time;
+        if (Math.abs(th_acc[0]) > 1.e4)
+          console.log(th_acc);
+        else {
+          th_spd[0] += th_acc[0] * time;
+          th_spd[1] += th_acc[1] * time;
+        }
     }
     //th_spd[0] *= (1 - diss * time);
     th[0] += (old_spd[0] + th_spd[0]) * time / 2;
     th[1] += (old_spd[1] + th_spd[1]) * time / 2;
+    
+    normalize();
 }
 
 function draw() {
@@ -114,14 +150,19 @@ function draw() {
         shape.y = y;
         shape.rotation = th[i] * 180 / Math.PI;
         
-        x += vlength[i] * Math.sin(th[i]);
+        x -= vlength[i] * Math.sin(th[i]);
         y += vlength[i] * Math.cos(th[i]);
     }
 }
 
 function tick(event) {
     
-    //solve();
+    solve();
+    
+    fps = createjs.Ticker.getMeasuredFPS();
+    
+    if (fps < 10)
+      return;
         
     step(1. / createjs.Ticker.getMeasuredFPS());
     
@@ -135,12 +176,12 @@ function tick(event) {
 
 function toggleCache(value) {
     // iterate all the children except the fpsLabel, and set up the cache:
-    var l = stage.numChildren - 1;
+    //var l = stage.numChildren - 1;
 
-    for (var i = 0; i < l; i++) {
+    for (var i = 0; i < 2; i++) {
         var shape = stage.getChildAt(i);
         if (value) {
-            shape.cache(-radius, -radius, radius * 2, radius * 2);
+            shape.cache(0, 0, 20, vlength[i] + 20);
         } else {
             shape.uncache();
         }

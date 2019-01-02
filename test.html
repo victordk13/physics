@@ -20,13 +20,13 @@ var shape;
 
 var g       = 9.8;      // m/s^2
 var m       = [1., 1.]; // only proportion matters
-var l       = [1., 1.5]; // also in m, and make it life-sized for better effect
-var th      = [1.5, 1.5]; // in radians
+var l       = [1., 0.7]; // also in m, and make it life-sized for better effect
+var th      = [1.2, 1.2]; // in radians
 var th_spd  = [0., 0.];
 var p       = [0,0];
 var p_spd   = [0,0];
 //var th_acc; // to solve for
-var diss    = 0.0001;
+var diss    = 0.00;
 
 var vlength = [0, 0];
 
@@ -231,7 +231,7 @@ function toggleCache(value) {
     for (var i = 0; i < 2; i++) {
         var shape = stage.getChildAt(i);
         if (value) {
-            shape.cache(0, 0, 20, vlength[i] + 20);
+            shape.cache(-1, -1, 22, vlength[i] + 22);
         } else {
             shape.uncache();
         }

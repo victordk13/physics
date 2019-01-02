@@ -1,3 +1,8 @@
-# physics
-See
+# Physics
+## Double pendulum
 https://victordk13.github.io/physics/double_pendulum.html
+
+See:
+* https://en.wikipedia.org/wiki/Double_pendulum
+* http://scienceworld.wolfram.com/physics/DoublePendulum.html
+

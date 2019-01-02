@@ -160,6 +160,9 @@ function init() {
     // start the tick and point it at the window so we can do some work before updating the stage:
     createjs.Ticker.timingMode = createjs.Ticker.RAF;
     createjs.Ticker.addEventListener("tick", tick);
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas, false);
 }
 
 function normalize() {
@@ -242,6 +245,13 @@ massProportion.oninput = function() {
   resize();
 }
 
+function resizeCanvas() {
+  rect = canvas.getBoundingClientRect();
+  canvas.width = window.innerWidth - 2 * rect.left;
+  canvas.height = window.innerHeight - 2 * rect.top;
+  calcVlength();
+  resize();
+}
     </script>   
   </body>
 </html>

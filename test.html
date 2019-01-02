@@ -29,8 +29,8 @@ var diss    = 0.00;
 
 var vlength = [0, 0];
 
-var A, b, E;
-var div, C1, C2, cdiff, sdiff; // TODEL
+var E;
+var div, C1, C2, cdiff, sdiff; // TODEL: debug
 
 function calcVlength() {
     var size = Math.min(canvas.width, canvas.height) / 3;
@@ -57,6 +57,7 @@ function Energy() {
   return LK() + LP();
 }
 
+// http://scienceworld.wolfram.com/physics/DoublePendulum.html
 function solveViaHamiltonian() {
   cdiff = Math.cos(th[0] - th[1]);
   sdiff = Math.sin(th[0] - th[1]);
@@ -123,8 +124,6 @@ function init() {
         shape.regX = shape.regY = 10;
         shape.x = canvas.width / 2;
         shape.y = canvas.height / 2;
-        //shape.velX = Math.random() * 10 - 5;
-        //shape.velY = Math.random() * 10 - 5;
 
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.
@@ -144,21 +143,6 @@ function init() {
     createjs.Ticker.addEventListener("tick", tick);
 }
 
-// http://scienceworld.wolfram.com/physics/DoublePendulum.html
-function solve() {
-    // calculate concrete values of equation
-    A = [ 
-        [(m[0] + m[1]) * l[0], m[1] * l[1] * Math.cos(th[0] - th[1])],
-        [l[1], l[0] * Math.cos(th[0] - th[1])]
-    ];
-    b = [
-        - m[1] * l[1] * th_spd[1] * th_spd[1] * Math.sin(th[0] - th[1]) - (m[0] + m[1]) * g * Math.sin(th[0]),
-        l[0] * th_spd[0] * th_spd[0] * Math.sin(th[0] - th[1]) - g * Math.sin(th[1])
-    ];
-    // solve for angular acceleration
-    th_acc = math.lusolve(A, b);
-}
-
 function normalize() {
   // computation errors will accumulate so we need at least keep total L constant
   var lk = LK();
@@ -169,25 +153,6 @@ function normalize() {
     th_spd[1] *= mul;
   }
   // else lk should be negative; we are fucked, let's do nothing
-}
-
-function step(time) {
-    var old_spd = th_spd;
-    // don't update speeds if solution is invalid
-    if (Array.isArray(th_acc) && isFinite(th_acc[0]) && isFinite(th_acc[0]))
-    {
-        if (Math.abs(th_acc[0]) > 1.e4)
-          console.log(th_acc);
-        else {
-          th_spd[0] += th_acc[0] * time;
-          th_spd[1] += th_acc[1] * time;
-        }
-    }
-    //th_spd[0] *= (1 - diss * time); // friction
-    th[0] += (old_spd[0] + th_spd[0]) * time / 2;
-    th[1] += (old_spd[1] + th_spd[1]) * time / 2;
-    
-    //normalize(); // constant energy
 }
 
 function draw() {

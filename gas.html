@@ -51,6 +51,7 @@ class Point {
     this.y = y;
   }
 
+  // square of distance (don't call Math.sqrt)
   static distanceSq(a, b) {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
@@ -61,10 +62,23 @@ class Point {
   static dot(a, b) {
     return a.x*b.x + a.y*b.y;
   }
-}
-
-function Energy() {
-  return LK() + LP();
+  
+  static add(a, b) {
+    return new Point(a.x + b.x, a.y + b.y);
+  }
+  
+  static sub(a, b) {
+    return new Point(a.x - b.x, a.y - b.y);
+  }
+  
+  static neg(a) {
+    return new Point(-a.x, -a.y);
+  }
+  
+  static mul(a, n) {
+    return new Point(a.x * n, a.y * n);
+  }
+  
 }
 
 
@@ -79,15 +93,17 @@ function init() {
         var mol = {};
         mol.shape = new createjs.Shape();
 
-        // all physical values in SI (m, s, etc.), all draw_* values in pixels
-        mol.x =  Math.random() * (box.w - 2) + 1;
-        mol.y =  Math.random() * (box.h - 2) + 1;
+        // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
+        //mol.tx =  Math.random() * (box.w - 2) + 1;
+        //mol.ty =  Math.random() * (box.h - 2) + 1;
+        mol.pos = new Point(Math.random() * (box.w - 2) + 1, Math.random() * (box.h - 2) + 1);
         
         // same speed, random direction
         v = 5; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
-        mol.vx = v * Math.cos(th);
-        mol.vy = v * Math.sin(th);
+        //mol.vx = v * Math.cos(th);
+        //mol.vy = v * Math.sin(th);
+        mol.v = new Point(v * Math.cos(th), v * Math.sin(th));
         mol.rad = 0.2;
         mol.draw_r = 2;
         mol.shape.graphics
@@ -105,7 +121,6 @@ function init() {
         stage.addChild(mol.shape);
         molecules.push(mol);
     }
-    // TODO: draw box
     box.shape = new createjs.Shape();
     stage.addChild(box.shape);
 
@@ -153,38 +168,74 @@ function draw() {
   //console.log(translateX(box.l), translateX(box.r) - translateX(box.l));
 
   molecules.forEach(function(mol) {
-    mol.shape.x = translateX(mol.x);
-    mol.shape.y = translateY(mol.y);
+    mol.shape.x = translateX(mol.pos.x);
+    mol.shape.y = translateY(mol.pos.y);
   });
 }
 
 // bounce and reflect molecules against walls
+// TODO: calculate the force/moment imparted by each molecule into the wall (calc. pressure) - must be m*(vx0 - vx1) (for vertical wall)
 function reflect(obj) {
-  if (obj.x <= box.l + obj.rad)
+  if (obj.pos.x <= box.l + obj.rad)
   {
-    obj.x = 2 * (box.l + obj.rad) - obj.x;
-    if (obj.vx - box.v[0] < 0)
-      obj.vx = - obj.vx + 2 * box.v[0];
+    obj.pos.x = 2 * (box.l + obj.rad) - obj.pos.x;
+    if (obj.v.x - box.v[0] < 0)
+      obj.v.x = - obj.v.x + 2 * box.v[0];
   }
-  if (obj.y <= box.t + obj.rad)
+  if (obj.pos.y <= box.t + obj.rad)
   {
-    obj.y = 2 * (box.t + obj.rad) - obj.y;
-    if (obj.vy - box.v[1] < 0)
-      obj.vy = - obj.vy + 2 * box.v[1];
+    obj.pos.y = 2 * (box.t + obj.rad) - obj.pos.y;
+    if (obj.v.y - box.v[1] < 0)
+      obj.v.y = - obj.v.y + 2 * box.v[1];
   }
   
-  if (obj.x >= box.r - obj.rad)
+  if (obj.pos.x >= box.r - obj.rad)
   {
-    obj.x = 2 * (box.r - obj.rad) - obj.x;
-    if (obj.vx - box.v[2] > 0)
-      obj.vx = - obj.vx + 2 * box.v[2];
+    obj.pos.x = 2 * (box.r - obj.rad) - obj.pos.x;
+    if (obj.v.x - box.v[2] > 0)
+      obj.v.x = - obj.v.x + 2 * box.v[2];
   }
-  if (obj.y >= box.b - obj.rad)
+  if (obj.pos.y >= box.b - obj.rad)
   {
-    obj.y = 2 * (box.b - obj.rad) - obj.y;
-    if (obj.vy - box.v[3] > 0)
-      obj.vy = - obj.vy + 2 * box.v[3];
+    obj.pos.y = 2 * (box.b - obj.rad) - obj.pos.y;
+    if (obj.v.y - box.v[3] > 0)
+      obj.v.y = - obj.v.y + 2 * box.v[3];
   }
+}
+
+function collisionTime(mol1, mol2) {
+  var v = Point.sub(mol1.v, mol2.v);
+  var x = Point.sub(mol2.pos, mol1.pos);
+  var vsq = Point.dot(v,v);
+  
+  var t = Point.dot(x,v)/vsq;
+  if (t < 0)
+    return t;
+  var min = (x.x - t*v.x)*(x.x - t*v.x) + (x.y - t*v.y)*(x.y - t*v.y);
+  var Rsq = (mol1.rad + mol2.rad) * (mol1.rad + mol2.rad);
+  if (min > Rsq)
+    return -1;
+  // collision is some time before (would be) minimum distance
+  // TODO: use approximate value instead of Math.sqrt()
+  delta = Math.sqrt((Rsq - min) / vsq);
+  return t - delta;
+}
+
+// time of collision to avoid calculating twice
+function collide(mol1, mol2, time) {
+  var pos1 = Point.add(mol1.pos, Point.mul(mol1.v, time));
+  var pos2 = Point.add(mol2.pos, Point.mul(mol2.v, time));
+}
+
+function stupidCollisions(mol, index, dur) {
+  molecules.forEach(function(mol2, index2) {
+    if (index != index2) {
+      var t = collisionTime(mol, mol2);
+      if (t >= 0 && dur >= t)
+        collide(mol, mol2, t);
+        
+    }
+  });
 }
 
 function move(dur) {
@@ -193,10 +244,24 @@ function move(dur) {
   box.r += box.v[2];
   box.b += box.v[3];
   molecules.forEach(function(mol, index) {
-    mol.x += mol.vx * dur;
-    mol.y += mol.vy * dur;
+    stupidCollisions(mol, index, dur);
+    mol.pos.x += mol.v.x * dur;
+    mol.pos.y += mol.v.y * dur;
     reflect(mol);
   });
+}
+
+function maxSpeed(arr) {
+  var len = arr.length, max = -Infinity;
+  while (len--) {
+    if (arr[len].v.x > max) {
+      max = arr[len].v.x;
+    }
+    if (arr[len].v.y > max) {
+      max = arr[len].v.y;
+    }
+  }
+  return max;
 }
 
 function tick(event) {
@@ -212,7 +277,7 @@ function tick(event) {
     move(dur);
     draw();
     
-    fpsLabel.text = Math.round(1. / dur) + " fps";
+    fpsLabel.text = Math.round(1. / dur) + " fps, Max speed = " + Math.round(maxSpeed(molecules) * 100) / 100;
 
     // draw the updates to stage:
     stage.update(event);

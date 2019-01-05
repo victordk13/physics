@@ -1,0 +1,253 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
+    <style>
+    html, body {
+      width:  100%;
+      height: 100%;
+      border: 0;
+      margin: 0px;
+      overflow: hidden;
+    }
+    
+    .controls {
+      display: inline-block;
+      width:  100%;
+      height: 40px;
+      padding: 10;
+    }
+    
+    .controls .slider {
+      width: 45%;
+      height: 40px;
+      margin: 10;
+    }
+    </style>
+
+  </head>
+  <body onload="init();">
+    <div class="controls">
+      <input type="checkbox" onClick="toggleCache(this.checked);" id="toggleCache"/>
+      <label for="toggleCache">cache enabled</label>
+      <!--input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion">
+      <input type="range" min="1" max="99" value="50" class="slider" id="massProportion"-->
+    </div>
+    <canvas id="testCanvas" width="720" height="720">Your browser doesn't support "canvas".</canvas>
+    
+<script>
+var canvas;
+var stage;
+var paused = false;
+
+var g = 9.8;      // m/s^2
+var N = 500;
+var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
+var molecules = [];
+
+class Point {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  static distanceSq(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+
+    return dx*dx + dy*dy;
+  }
+  
+  static dot(a, b) {
+    return a.x*b.x + a.y*b.y;
+  }
+}
+
+function Energy() {
+  return LK() + LP();
+}
+
+
+function init() {
+
+    // create a new stage and point it at our canvas:
+    canvas = document.getElementById("testCanvas");
+    stage = new createjs.Stage(canvas);
+    
+    
+    for (var i = 0; i < N; i++) {
+        var mol = {};
+        mol.shape = new createjs.Shape();
+
+        // all physical values in SI (m, s, etc.), all draw_* values in pixels
+        mol.x =  Math.random() * (box.w - 2) + 1;
+        mol.y =  Math.random() * (box.h - 2) + 1;
+        
+        // same speed, random direction
+        v = 5; // (initial) 1-frame displacement will be v/fps
+        th = 2 * Math.PI * Math.random();
+        mol.vx = v * Math.cos(th);
+        mol.vy = v * Math.sin(th);
+        mol.rad = 0.2;
+        mol.draw_r = 2;
+        mol.shape.graphics
+          .setStrokeStyle(1)
+          .beginStroke("rgb(" 
+            + Math.round(Math.random() * 255) + ","
+            + Math.round(Math.random() * 255) + ","
+            + Math.round(Math.random() * 255) + ")")
+          .drawCircle(0, 0, mol.draw_r);
+
+        // turn snapToPixel on for all shapes - it's set to false by default on Shape.
+        // it won't do anything until stage.snapToPixelEnabled is set to true.
+        // shape.snapToPixel = true;
+
+        stage.addChild(mol.shape);
+        molecules.push(mol);
+    }
+    // TODO: draw box
+    box.shape = new createjs.Shape();
+    stage.addChild(box.shape);
+
+    // add a text object to output the current FPS:
+    fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#000");
+    stage.addChild(fpsLabel);
+    fpsLabel.x = 10;
+    fpsLabel.y = 20;
+
+    // start the tick and point it at the window so we can do some work before updating the stage:
+    createjs.Ticker.timingMode = createjs.Ticker.RAF;
+    createjs.Ticker.addEventListener("tick", tick);
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas, false);
+    
+    window.addEventListener("focus", function(event) { paused = false; });
+    window.addEventListener("blur", function(event) { paused = true; });
+}
+
+function translateX(x) {
+  var bs = Math.min(canvas.width, canvas.height);
+  return (canvas.width - bs) / 2 + x * bs / box.w;
+}
+
+function translateY(y) {
+  var bs = Math.min(canvas.width, canvas.height);
+  return (canvas.height - bs) / 2 + y * bs / box.h;
+}
+
+function resize() {
+  var bs = Math.min(canvas.width, canvas.height);
+  //box.shape.width = box.shape.height = bs;
+  box.shape.x = translateX(0);
+  box.shape.y = translateY(0);
+  
+  box.shape.graphics
+    .clear()
+    .setStrokeStyle(1)
+    .beginStroke("#000")
+    .drawRect(0, 0, translateX(box.r) - translateX(box.l), translateY(box.b) - translateY(box.t));  
+}
+
+function draw() {
+  //console.log(translateX(box.l), translateX(box.r) - translateX(box.l));
+
+  molecules.forEach(function(mol) {
+    mol.shape.x = translateX(mol.x);
+    mol.shape.y = translateY(mol.y);
+  });
+}
+
+// bounce and reflect molecules against walls
+function reflect(obj) {
+  if (obj.x <= box.l + obj.rad)
+  {
+    obj.x = 2 * (box.l + obj.rad) - obj.x;
+    if (obj.vx - box.v[0] < 0)
+      obj.vx = - obj.vx + 2 * box.v[0];
+  }
+  if (obj.y <= box.t + obj.rad)
+  {
+    obj.y = 2 * (box.t + obj.rad) - obj.y;
+    if (obj.vy - box.v[1] < 0)
+      obj.vy = - obj.vy + 2 * box.v[1];
+  }
+  
+  if (obj.x >= box.r - obj.rad)
+  {
+    obj.x = 2 * (box.r - obj.rad) - obj.x;
+    if (obj.vx - box.v[2] > 0)
+      obj.vx = - obj.vx + 2 * box.v[2];
+  }
+  if (obj.y >= box.b - obj.rad)
+  {
+    obj.y = 2 * (box.b - obj.rad) - obj.y;
+    if (obj.vy - box.v[3] > 0)
+      obj.vy = - obj.vy + 2 * box.v[3];
+  }
+}
+
+function move(dur) {
+  box.l += box.v[0];
+  box.t += box.v[1];
+  box.r += box.v[2];
+  box.b += box.v[3];
+  molecules.forEach(function(mol, index) {
+    mol.x += mol.vx * dur;
+    mol.y += mol.vy * dur;
+    reflect(mol);
+  });
+}
+
+function tick(event) {
+    if (paused || createjs.Ticker.getMeasuredFPS() < 1.)
+      return;
+    dur = 1. / createjs.Ticker.getMeasuredFPS();
+    step = 0.005;
+    
+    /*for (var t = 0; t < dur; t += step)
+    {
+      // TODO: advance the model by a step
+    }*/
+    move(dur);
+    draw();
+    
+    fpsLabel.text = Math.round(1. / dur) + " fps";
+
+    // draw the updates to stage:
+    stage.update(event);
+}
+
+function toggleCache(value) {
+    // iterate all the children except the fpsLabel, and set up the cache:
+    //var l = stage.numChildren - 1;
+    
+    molecules.forEach(function(mol) {
+        if (value) {
+            mol.shape.cache(-mol.draw_r - 1, -mol.draw_r - 1, 2*mol.draw_r + 2, 2*mol.draw_r + 2);
+        } else {
+            mol.shape.uncache();
+        }      
+    });
+}
+
+// range change handler(s)
+var lengthProportion = document.getElementById("lengthProportion");
+
+/*lengthProportion.oninput = function() {
+  //this.value;
+  resize();
+}*/
+
+// window size change handler
+function resizeCanvas() {
+  rect = canvas.getBoundingClientRect();
+  canvas.width = window.innerWidth - 2 * rect.left;
+  canvas.height = window.innerHeight - 2 * rect.top;
+  resize();
+}
+
+</script>
+
+  </body>
+</html>

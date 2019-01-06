@@ -2,13 +2,15 @@
   <head>
     <meta charset="UTF-8">
     <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
-    <style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.bundle.min.js"></script>
+    <style title="gas-main-style">
     html, body {
       width:  100%;
       height: 100%;
       border: 0;
       margin: 0px;
       overflow: hidden;
+      position: relative;
     }
     
     .controls {
@@ -23,6 +25,10 @@
       height: 40px;
       margin: 10;
     }
+    
+    canvas {position:absolute;}
+    #chartCanvas { left:0 }
+    #boxCanvas { left:0 }
     </style>
 
   </head>
@@ -33,18 +39,21 @@
       <!--input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion">
       <input type="range" min="1" max="99" value="50" class="slider" id="massProportion"-->
     </div>
-    <canvas id="testCanvas" width="720" height="720">Your browser doesn't support "canvas".</canvas>
+    <!--canvas id="chartCanvas" width="500" height="500">Your browser doesn't support "canvas".</canvas-->
+    <canvas id="boxCanvas" width="1280" height="720">Your browser doesn't support "canvas".</canvas>
     
 <script>
 var canvas;
 var stage;
 var paused = false;
 
-var g = 0;
-var N = 200;
+var g = 2;
+var N = 350;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
 var molecules = [];
+
+var vchart;
 
 class Point {
   constructor(x, y) {
@@ -52,7 +61,7 @@ class Point {
     this.y = y;
   }
 
-  // square of distance (don't call Math.sqrt)
+  // square of distance (try not to call Math.sqrt)
   static distanceSq(a, b) {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
@@ -79,14 +88,28 @@ class Point {
   static mul(a, n) {
     return new Point(a.x * n, a.y * n);
   }
-  
 }
 
+function addChart() {
+    var ctx = document.getElementById('chartCanvas').getContext('2d');
+    vchart = new Chart(ctx, {
+        type: 'line',
+        data: [],
+        options: {
+            elements: {
+                line: {
+                    tension: 0, // disables bezier curves
+                }
+            },
+            responsive: false
+        }
+    });
+}
 
 function init() {
 
     // create a new stage and point it at our canvas:
-    canvas = document.getElementById("testCanvas");
+    canvas = document.getElementById("boxCanvas");
     stage = new createjs.Stage(canvas);
     
     
@@ -95,28 +118,33 @@ function init() {
         mol.shape = new createjs.Shape();
 
         // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
+        mol.m = 1;
+        mol.rad = 0.3;
+        
+        if (i==0) {
+          mol.m = 38;
+          mol.rad = 18;
+          const bbv = Math.PI * mol.rad * mol.rad;
+          console.log("Big ball density = " + (mol.m / bbv));
+          console.log("Gas density = " + (1 * (N-1) / (box.w * box.h - bbv)));
+        }
+
         //mol.tx =  Math.random() * (box.w - 2) + 1;
         //mol.ty =  Math.random() * (box.h - 2) + 1;
-        mol.pos = new Point(Math.random() * (box.w - 2) + 1, Math.random() * (box.h - 2) + 1);
+        do {
+          mol.pos = new Point(
+            Math.random() * (box.w - 2 * mol.rad) + mol.rad, 
+            Math.random() * (box.h - 2 * mol.rad) + mol.rad);
+        } while (i>0 && Point.distanceSq(mol.pos, molecules[0].pos) < 
+          (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
         
         // same speed, random direction
-        v = 7; // (initial) 1-frame displacement will be v/fps
+        v = 10; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
         mol.v = new Point(v * Math.cos(th), v * Math.sin(th));
         
-        mol.m = 1;
-        mol.rad = 0.7;
-        mol.draw_r = 7;
-        mol.shape.graphics
-          .setStrokeStyle(1)
-          .beginStroke("rgb(" 
-            + Math.round(Math.random() * 255) + ","
-            + Math.round(Math.random() * 255) + ","
-            + Math.round(Math.random() * 255) + ")")
-          .drawCircle(0, 0, mol.draw_r);
-
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.
         // shape.snapToPixel = true;
@@ -126,6 +154,9 @@ function init() {
     }
     box.shape = new createjs.Shape();
     stage.addChild(box.shape);
+    stats = calcStats(molecules);
+
+    //addChart();
 
     // add a text object to output the current FPS:
     fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#000");
@@ -164,7 +195,19 @@ function resize() {
     .clear()
     .setStrokeStyle(1)
     .beginStroke("#000")
-    .drawRect(0, 0, translateX(box.r) - translateX(box.l), translateY(box.b) - translateY(box.t));  
+    .drawRect(0, 0, translateX(box.r) - translateX(box.l), translateY(box.b) - translateY(box.t));
+  
+  molecules.forEach(function(mol) {
+    mol.draw_r = mol.rad * bs / box.w;
+    mol.shape.graphics
+      .clear()
+      .setStrokeStyle(1)
+      .beginStroke("rgb(" 
+        + Math.round(Math.random() * 255) + ","
+        + Math.round(Math.random() * 255) + ","
+        + Math.round(Math.random() * 255) + ")")
+      .drawCircle(0, 0, mol.draw_r);
+  });
 }
 
 function draw() {
@@ -268,9 +311,10 @@ function move(dur) {
   box.b += box.v[3];
   molecules.forEach(function(mol, index) {
     stupidCollisions(mol, index, dur);
-    mol.pos.x += mol.v.x * dur;
-    mol.pos.y += mol.v.y * dur;
     reflect(mol);
+    mol.pos.x += mol.v.x * dur;
+    mol.v.y += g * dur;
+    mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
   });
 }
 
@@ -338,9 +382,21 @@ var lengthProportion = document.getElementById("lengthProportion");
 
 // window size change handler
 function resizeCanvas() {
-  rect = canvas.getBoundingClientRect();
-  canvas.width = window.innerWidth - 2 * rect.left;
-  canvas.height = window.innerHeight - 2 * rect.top;
+  var rect = canvas.getBoundingClientRect();
+/*  var chartCnv = document.getElementById('chartCanvas');
+  if (window.innerWidth > window.innerHeight) {
+    chartCnv.height = chartCnv.width = window.innerWidth / 4;
+    canvas.width = window.innerWidth - chartCnv.width;
+    canvas.height = window.innerHeight - 2 * rect.top;
+  } else {
+    chartCnv.width = window.innerWidth;
+    chartCnv.height = window.innerHeight / 4;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - chartCnv.height - 2 * rect.top;
+  }
+  vchart.update(0);*/
+  canvas.width = window.innerWidth - 20;
+  canvas.height = window.innerHeight - rect.top - 20;
   resize();
 }
 

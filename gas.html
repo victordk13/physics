@@ -40,9 +40,10 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 9.8;      // m/s^2
-var N = 500;
+var g = 0;
+var N = 200;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
+var stats = {};
 var molecules = [];
 
 class Point {
@@ -99,13 +100,15 @@ function init() {
         mol.pos = new Point(Math.random() * (box.w - 2) + 1, Math.random() * (box.h - 2) + 1);
         
         // same speed, random direction
-        v = 5; // (initial) 1-frame displacement will be v/fps
+        v = 7; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
         mol.v = new Point(v * Math.cos(th), v * Math.sin(th));
-        mol.rad = 0.2;
-        mol.draw_r = 2;
+        
+        mol.m = 1;
+        mol.rad = 0.7;
+        mol.draw_r = 7;
         mol.shape.graphics
           .setStrokeStyle(1)
           .beginStroke("rgb(" 
@@ -216,26 +219,46 @@ function collisionTime(mol1, mol2) {
   if (min > Rsq)
     return -1;
   // collision is some time before (would be) minimum distance
-  // TODO: use approximate value instead of Math.sqrt()
+  // TODO: use approximate value instead of Math.sqrt()?
   delta = Math.sqrt((Rsq - min) / vsq);
   return t - delta;
 }
 
 // time of collision to avoid calculating twice
 function collide(mol1, mol2, time) {
+  //console.log(
+  //  mol1.pos.x, mol1.pos.y, mol1.v.x, mol1.v.y, 
+  //  mol2.pos.x, mol2.pos.y, mol2.v.x, mol2.v.y, time);
+    
   var pos1 = Point.add(mol1.pos, Point.mul(mol1.v, time));
   var pos2 = Point.add(mol2.pos, Point.mul(mol2.v, time));
+  
+  mol1.pos = pos1;
+  mol2.pos = pos2;
+  // (m1*v1 + m2*v2) / (m1 + m2)
+  var vc = Point.mul(Point.add(Point.mul(mol1.v, mol1.m), Point.mul(mol2.v, mol2.m)), 1/(mol1.m + mol2.m));
+  var x = Point.sub(pos2, pos1);
+  var v1c = Point.sub(mol1.v, vc);
+  mol1.v = Point.sub(mol1.v, Point.mul(x, 2 * Point.dot(v1c, x)/Point.dot(x, x)));
+  var v2c = Point.sub(mol2.v, vc);
+  mol2.v = Point.sub(mol2.v, Point.mul(x, 2 * Point.dot(v2c, x)/Point.dot(x, x)));
+  
+  //console.log(pos1.x, pos1.y, pos2.x, pos2.y, vc.x, vc.y, x.x, x.y, 
+  //  mol1.v.x, mol1.v.y, mol2.v.x, mol2.v.y);
 }
 
 function stupidCollisions(mol, index, dur) {
+  var collided = false;
   molecules.forEach(function(mol2, index2) {
     if (index != index2) {
       var t = collisionTime(mol, mol2);
-      if (t >= 0 && dur >= t)
+      if (t >= 0 && dur >= t) {
         collide(mol, mol2, t);
-        
+        collided = true;
+      }
     }
   });
+  return collided;
 }
 
 function move(dur) {
@@ -251,17 +274,25 @@ function move(dur) {
   });
 }
 
-function maxSpeed(arr) {
-  var len = arr.length, max = -Infinity;
+function calcStats(arr) {
+  var stats = {vMax: 0, vMin: Infinity, vAvg: 0, Esum: 0};
+  var len = arr.length;
   while (len--) {
-    if (arr[len].v.x > max) {
-      max = arr[len].v.x;
+    var v = Math.sqrt(Point.dot(arr[len].v, arr[len].v));
+    if (v > stats.vMax) {
+      stats.vMax = v;
     }
-    if (arr[len].v.y > max) {
-      max = arr[len].v.y;
+    if (v < stats.vMin) {
+      stats.vMin = v;
     }
+    stats.vAvg += v;
+    stats.Esum += arr[len].m*v*v/2 + arr[len].m*arr[len].pos.y*g;
   }
-  return max;
+  return stats;
+}
+
+function R2(v) {
+  return Math.round(v * 100) / 100;
 }
 
 function tick(event) {
@@ -276,8 +307,9 @@ function tick(event) {
     }*/
     move(dur);
     draw();
+    stats = calcStats(molecules);
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, Max speed = " + Math.round(maxSpeed(molecules) * 100) / 100;
+    fpsLabel.text = Math.round(1. / dur) + " fps, Max speed = " + R2(stats.vMax) + ", E = " + R2(stats.Esum);
 
     // draw the updates to stage:
     stage.update(event);

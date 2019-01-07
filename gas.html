@@ -256,11 +256,11 @@ function collisionTime(mol1, mol2) {
   
   var t = Point.dot(x,v)/vsq;
   if (t < 0)
-    return t;
+    return -Infinity;
   var min = (x.x - t*v.x)*(x.x - t*v.x) + (x.y - t*v.y)*(x.y - t*v.y);
   var Rsq = (mol1.rad + mol2.rad) * (mol1.rad + mol2.rad);
   if (min > Rsq)
-    return -1;
+    return -Infinity;
   // collision is some time before (would be) minimum distance
   // TODO: use approximate value instead of Math.sqrt()?
   delta = Math.sqrt((Rsq - min) / vsq);
@@ -295,7 +295,7 @@ function stupidCollisions(mol, index, dur) {
   molecules.forEach(function(mol2, index2) {
     if (index != index2) {
       var t = collisionTime(mol, mol2);
-      if (t >= 0 && dur >= t) {
+      if (isFinite(t) && dur >= t) {
         collide(mol, mol2, t);
         collided = true;
       }

@@ -313,8 +313,8 @@ function move(dur) {
     stupidCollisions(mol, index, dur);
     reflect(mol);
     mol.pos.x += mol.v.x * dur;
-    mol.v.y += g * dur;
     mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
+    mol.v.y += g * dur;
   });
 }
 
@@ -330,7 +330,7 @@ function calcStats(arr) {
       stats.vMin = v;
     }
     stats.vAvg += v;
-    stats.Esum += arr[len].m*v*v/2 + arr[len].m*arr[len].pos.y*g;
+    stats.Esum += arr[len].m*v*v/2 - arr[len].m*arr[len].pos.y*g;
   }
   return stats;
 }

@@ -319,10 +319,11 @@ function move(dur) {
 }
 
 function calcStats(arr) {
-  var stats = {vMax: 0, vMin: Infinity, vAvg: 0, Esum: 0};
+  var stats = {vMax: 0, vMin: Infinity, vAvg: 0, Esum: 0, RMS: 0};
   var len = arr.length;
   while (len--) {
-    var v = Math.sqrt(Point.dot(arr[len].v, arr[len].v));
+    var v2 = Point.dot(arr[len].v, arr[len].v);
+    var v = Math.sqrt(v2);
     if (v > stats.vMax) {
       stats.vMax = v;
     }
@@ -330,13 +331,12 @@ function calcStats(arr) {
       stats.vMin = v;
     }
     stats.vAvg += v;
-    stats.Esum += arr[len].m*v*v/2 - arr[len].m*arr[len].pos.y*g;
+    stats.Esum += arr[len].m*v2/2 - arr[len].m*arr[len].pos.y*g;
+    stats.RMS += v2;
   }
+  stats.vAvg /= arr.length;
+  stats.RMS = Math.sqrt(stats.RMS / arr.length);
   return stats;
-}
-
-function R2(v) {
-  return Math.round(v * 100) / 100;
 }
 
 function tick(event) {
@@ -353,7 +353,7 @@ function tick(event) {
     draw();
     stats = calcStats(molecules);
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, Max speed = " + R2(stats.vMax) + ", E = " + R2(stats.Esum);
+    fpsLabel.text = Math.round(1. / dur) + " fps, RMS = " + stats.RMS.toFixed(2) + ", E = " + stats.Esum.toFixed(2);
 
     // draw the updates to stage:
     stage.update(event);

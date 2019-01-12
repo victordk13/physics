@@ -12,45 +12,49 @@
     }
     
     .controls {
+      justify-content:center;
+      text-align:center;
       display: inline-block;
       width:  100%;
-      height: 40px;
-      padding: 10;
+      height: 80px;
+      padding: 0;
     }
     
     .controls input {
       width: 45%;
       height: 40px;
-      margin: 10;
+      margin: 20;
     }
     </style>
 
   </head>
   <body onload="init();">
     <div class="controls">
-      <!--input type="checkbox" onClick="toggleCache(this.checked);" id="toggleCache"/>
-      <label for="toggleCache">cache enabled</label-->
       <input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion">
       <input type="range" min="1" max="99" value="50" class="slider" id="massProportion">
     </div>
     <canvas id="testCanvas" width="720" height="720">Your browser doesn't support "canvas".</canvas>
+    <div class="controls">
+      <input type="range" min="-50" max="50" value="-1" class="slider" id="energy">
+      <input type="range" min="1" max="99" value="10" class="slider" id="gravity">
+    </div>
     <script>
 var canvas;
 var stage;
 var shape;
 
-var g       = 9.8;      // m/s^2
+var g       = 10;      // "m/s^2"
 var l       = [1., 1.]; // also in m, and make it life-sized for better effect
 var m       = [1., 1.]; // only proportion matters
 var th      = [1.5, 1.5]; // in radians
-var th_spd  = [0., 0.];
+var th_spd  = [-0.01, -0.01];
 var p       = [0,0];
 var p_spd   = [0,0];
 var diss    = 0.00;
 
 var vlength = [0, 0];
 
-var E;
+var E = -1;
 var div, C1, C2, cdiff, sdiff; // TODEL: debug
 
 function calcVlength() {
@@ -142,8 +146,9 @@ function resize() {
 }
 
 function init() {
-    E = Energy();
+    //E = Energy();
     solveViaHamiltonian();
+    normalize();
 
     // create a new stage and point it at our canvas:
     canvas = document.getElementById("testCanvas");
@@ -217,7 +222,7 @@ function tick(event) {
     }
     draw();
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + Math.round(Energy()*100)/100;
+    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + E.toFixed(2) + ", g = " + g.toFixed(2);
 
     // draw the updates to stage:
     stage.update(event);
@@ -239,12 +244,14 @@ function toggleCache(value) {
 
 var lengthProportion = document.getElementById("lengthProportion");
 var massProportion = document.getElementById("massProportion");
+var energy = document.getElementById("energy");
+var gravity = document.getElementById("gravity");
 
 lengthProportion.oninput = function() {
   var sum = l[0] + l[1];
   l[0] = sum * this.value / 100;
   l[1] = sum * (100 - this.value) / 100;
-  E = Energy();
+  normalize();
   calcVlength();
   resize();
 }
@@ -253,9 +260,18 @@ massProportion.oninput = function() {
   var sum = m[0] + m[1];
   m[0] = sum * this.value / 100;
   m[1] = sum * (100 - this.value) / 100;
-  E = Energy();
+  normalize();
   calcVlength();
   resize();
+}
+
+energy.oninput = function() {
+  E = this.value;
+  normalize();
+}
+
+gravity.oninput = function() {
+  g = Number(this.value);
 }
 
 function resizeCanvas() {

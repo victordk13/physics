@@ -2,7 +2,6 @@
   <head>
     <meta charset="UTF-8">
     <script src="https://code.createjs.com/1.0.0/createjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.3/Chart.bundle.min.js"></script>
     <style title="gas-main-style">
     html, body {
       width:  100%;
@@ -27,7 +26,6 @@
     }
     
     canvas {position:absolute;}
-    #chartCanvas { left:0 }
     #boxCanvas { left:0 }
     </style>
 
@@ -36,10 +34,7 @@
     <div class="controls">
       <input type="checkbox" onClick="toggleCache(this.checked);" id="toggleCache"/>
       <label for="toggleCache">cache enabled</label>
-      <!--input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion">
-      <input type="range" min="1" max="99" value="50" class="slider" id="massProportion"-->
     </div>
-    <!--canvas id="chartCanvas" width="500" height="500">Your browser doesn't support "canvas".</canvas-->
     <canvas id="boxCanvas" width="1280" height="720">Your browser doesn't support "canvas".</canvas>
     
 <script>
@@ -47,7 +42,7 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 2;
+var g = 0;
 var N = 350;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
@@ -88,22 +83,6 @@ class Point {
   static mul(a, n) {
     return new Point(a.x * n, a.y * n);
   }
-}
-
-function addChart() {
-    var ctx = document.getElementById('chartCanvas').getContext('2d');
-    vchart = new Chart(ctx, {
-        type: 'line',
-        data: [],
-        options: {
-            elements: {
-                line: {
-                    tension: 0, // disables bezier curves
-                }
-            },
-            responsive: false
-        }
-    });
 }
 
 function init() {
@@ -155,8 +134,6 @@ function init() {
     box.shape = new createjs.Shape();
     stage.addChild(box.shape);
     stats = calcStats(molecules);
-
-    //addChart();
 
     // add a text object to output the current FPS:
     fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#000");
@@ -372,29 +349,10 @@ function toggleCache(value) {
     });
 }
 
-// range change handler(s)
-var lengthProportion = document.getElementById("lengthProportion");
-
-/*lengthProportion.oninput = function() {
-  //this.value;
-  resize();
-}*/
-
 // window size change handler
 function resizeCanvas() {
   var rect = canvas.getBoundingClientRect();
-/*  var chartCnv = document.getElementById('chartCanvas');
-  if (window.innerWidth > window.innerHeight) {
-    chartCnv.height = chartCnv.width = window.innerWidth / 4;
-    canvas.width = window.innerWidth - chartCnv.width;
-    canvas.height = window.innerHeight - 2 * rect.top;
-  } else {
-    chartCnv.width = window.innerWidth;
-    chartCnv.height = window.innerHeight / 4;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - chartCnv.height - 2 * rect.top;
-  }
-  vchart.update(0);*/
+
   canvas.width = window.innerWidth - 20;
   canvas.height = window.innerHeight - rect.top - 20;
   resize();

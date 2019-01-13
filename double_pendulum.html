@@ -42,6 +42,7 @@
 var canvas;
 var stage;
 var shape;
+var labels = new Array(4);
 
 var g       = 10;      // "m/s^2"
 var l       = [1., 1.]; // also in m, and make it life-sized for better effect
@@ -169,11 +170,11 @@ function init() {
     calcVlength();
     resize();
 
-    // add a text object to output the current FPS:
-    fpsLabel = new createjs.Text("-- fps", "bold 18px Arial", "#000");
-    stage.addChild(fpsLabel);
-    fpsLabel.x = 10;
-    fpsLabel.y = 20;
+    // add text objects to output stats:
+    for (var i = 0; i < 4; i++) {
+      labels[i] = new createjs.Text("---", "bold 18px Arial", "#000");
+      stage.addChild(labels[i]);
+    }
 
     // start the tick and point it at the window so we can do some work before updating the stage:
     createjs.Ticker.timingMode = createjs.Ticker.RAF;
@@ -222,14 +223,17 @@ function tick(event) {
     }
     draw();
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + E.toFixed(2) + ", g = " + g.toFixed(2);
+    labels[0].text = Math.round(1. / dur) + " fps, L1:L2 = " + Math.round(l[0]*100) + ":" + Math.round(l[1]*100);
+    labels[1].text = "M1:M2 = " + Math.round(m[0]*100) + ":" + Math.round(m[1]*100);
+    labels[2].text = "E = " + E.toFixed(2);
+    labels[3].text = "g = " + g.toFixed(2);
 
     // draw the updates to stage:
     stage.update(event);
 }
 
 function toggleCache(value) {
-    // iterate all the children except the fpsLabel, and set up the cache:
+    // iterate all the children except the labels, and set up the cache:
     //var l = stage.numChildren - 1;
 
     for (var i = 0; i < 2; i++) {
@@ -280,6 +284,11 @@ function resizeCanvas() {
   canvas.height = window.innerHeight - 2 * rect.top;
   calcVlength();
   resize();
+  
+  for (var i = 0; i < 4; i++) {
+    labels[i].x = i%2 ? canvas.width - 170 : 20;
+    labels[i].y = i>1 ? canvas.height - 30 : 20;
+  }  
 }
     </script>   
   </body>

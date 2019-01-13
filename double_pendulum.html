@@ -30,19 +30,28 @@
   </head>
   <body onload="init();">
     <div class="controls">
-      <input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion">
-      <input type="range" min="1" max="99" value="50" class="slider" id="massProportion">
+      <input type="range" min="1" max="99" value="50" class="slider" id="lengthProportion" list="fiftytick">
+      <input type="range" min="1" max="99" value="50" class="slider" id="massProportion" list="fiftytick">
     </div>
     <canvas id="testCanvas" width="720" height="720">Your browser doesn't support "canvas".</canvas>
     <div class="controls">
-      <input type="range" min="-50" max="50" value="-1" class="slider" id="energy">
-      <input type="range" min="1" max="99" value="10" class="slider" id="gravity">
+      <input type="range" min="-50" max="50" value="-1" class="slider" id="energy" list="zerotick">
+      <input type="range" min="0" max="100" value="50" class="slider" id="gravity" list="fiftytick">
     </div>
+    <datalist id="zerotick">
+      <option value="0">
+    </datalist>
+    <datalist id="fiftytick">
+      <option value="0">
+      <option value="50">
+      <option value="100">
+    </datalist>
     <script>
 var canvas;
 var stage;
 var shape;
 var labels = new Array(4);
+var paused = false;
 
 var g       = 10;      // "m/s^2"
 var l       = [1., 1.]; // also in m, and make it life-sized for better effect
@@ -81,6 +90,25 @@ function Lagrangian() {
 
 function Energy() {
   return LK() + LP();
+}
+
+function gcd(a,b) {
+    a = Math.abs(a);
+    b = Math.abs(b);
+    if (b > a) {var temp = a; a = b; b = temp;}
+    while (true) {
+        if (b == 0) return a;
+        a %= b;
+        if (a == 0) return b;
+        b %= a;
+    }
+}
+
+function proportion(a,b) {
+  var x = Math.round(a*100);
+  var y = Math.round(b*100);
+  var z = gcd(x,y);
+  return (x/z) + ":" + (y/z);
 }
 
 // http://scienceworld.wolfram.com/physics/DoublePendulum.html
@@ -182,10 +210,12 @@ function init() {
     
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas, false);
+    window.addEventListener("focus", function(event) { paused = false; });
+    window.addEventListener("blur", function(event) { paused = true; });
 }
 
 function normalize() {
-  // computation errors will accumulate so we need at least keep total L constant
+  // computation errors will accumulate so we need at least keep total E constant
   var lk = LK();
   var lp = LP();
   if (lp <= E) {
@@ -193,7 +223,10 @@ function normalize() {
     th_spd[0] *= mul;
     th_spd[1] *= mul;
   }
-  // else lk should be negative; we are fucked, let's do nothing
+  else { // else lk should be negative; instead set E to lp
+    E = lp;
+    document.getElementById("energy").value = Math.ceil(E);
+  }
 }
 
 function draw() {
@@ -211,10 +244,13 @@ function draw() {
     }
 }
 
-function tick(event) {    
-    dur = 1. / createjs.Ticker.getMeasuredFPS();
-    step = 0.005;
+function tick(event) {
+    const dur = 1. / createjs.Ticker.getMeasuredFPS();
+    const step = 0.005;
     
+    if (paused || createjs.Ticker.getMeasuredFPS() < 1.)
+      return;
+
     for (var t = 0; t < dur; t += step)
     {
       solveViaHamiltonian();
@@ -223,8 +259,8 @@ function tick(event) {
     }
     draw();
     
-    labels[0].text = Math.round(1. / dur) + " fps, L1:L2 = " + Math.round(l[0]*100) + ":" + Math.round(l[1]*100);
-    labels[1].text = "M1:M2 = " + Math.round(m[0]*100) + ":" + Math.round(m[1]*100);
+    labels[0].text = Math.round(1. / dur) + " fps, L1:L2 = " + proportion(l[0], l[1]);
+    labels[1].text = "M1:M2 = " + proportion(m[0], m[1]);
     labels[2].text = "E = " + E.toFixed(2);
     labels[3].text = "g = " + g.toFixed(2);
 
@@ -275,7 +311,7 @@ energy.oninput = function() {
 }
 
 gravity.oninput = function() {
-  g = Number(this.value);
+  g = 10**(this.value/50);
 }
 
 function resizeCanvas() {

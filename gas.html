@@ -50,7 +50,7 @@ var molecules = [];
 
 var vchart;
 
-class Point {
+class Vec {
   constructor(x, y) {
     this.x = x;
     this.y = y;
@@ -69,19 +69,19 @@ class Point {
   }
   
   static add(a, b) {
-    return new Point(a.x + b.x, a.y + b.y);
+    return new Vec(a.x + b.x, a.y + b.y);
   }
   
   static sub(a, b) {
-    return new Point(a.x - b.x, a.y - b.y);
+    return new Vec(a.x - b.x, a.y - b.y);
   }
   
   static neg(a) {
-    return new Point(-a.x, -a.y);
+    return new Vec(-a.x, -a.y);
   }
   
   static mul(a, n) {
-    return new Point(a.x * n, a.y * n);
+    return new Vec(a.x * n, a.y * n);
   }
 }
 
@@ -111,10 +111,10 @@ function init() {
         //mol.tx =  Math.random() * (box.w - 2) + 1;
         //mol.ty =  Math.random() * (box.h - 2) + 1;
         do {
-          mol.pos = new Point(
+          mol.pos = new Vec(
             Math.random() * (box.w - 2 * mol.rad) + mol.rad, 
             Math.random() * (box.h - 2 * mol.rad) + mol.rad);
-        } while (i>0 && Point.distanceSq(mol.pos, molecules[0].pos) < 
+        } while (i>0 && Vec.distanceSq(mol.pos, molecules[0].pos) < 
           (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
         
         // same speed, random direction
@@ -122,7 +122,7 @@ function init() {
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
-        mol.v = new Point(v * Math.cos(th), v * Math.sin(th));
+        mol.v = new Vec(v * Math.cos(th), v * Math.sin(th));
         
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.
@@ -227,11 +227,11 @@ function reflect(obj) {
 }
 
 function collisionTime(mol1, mol2) {
-  var v = Point.sub(mol1.v, mol2.v);
-  var x = Point.sub(mol2.pos, mol1.pos);
-  var vsq = Point.dot(v,v);
+  var v = Vec.sub(mol1.v, mol2.v);
+  var x = Vec.sub(mol2.pos, mol1.pos);
+  var vsq = Vec.dot(v,v);
   
-  var t = Point.dot(x,v)/vsq;
+  var t = Vec.dot(x,v)/vsq;
   if (t < 0)
     return -Infinity;
   var min = (x.x - t*v.x)*(x.x - t*v.x) + (x.y - t*v.y)*(x.y - t*v.y);
@@ -250,18 +250,18 @@ function collide(mol1, mol2, time) {
   //  mol1.pos.x, mol1.pos.y, mol1.v.x, mol1.v.y, 
   //  mol2.pos.x, mol2.pos.y, mol2.v.x, mol2.v.y, time);
     
-  var pos1 = Point.add(mol1.pos, Point.mul(mol1.v, time));
-  var pos2 = Point.add(mol2.pos, Point.mul(mol2.v, time));
+  var pos1 = Vec.add(mol1.pos, Vec.mul(mol1.v, time));
+  var pos2 = Vec.add(mol2.pos, Vec.mul(mol2.v, time));
   
   mol1.pos = pos1;
   mol2.pos = pos2;
   // (m1*v1 + m2*v2) / (m1 + m2)
-  var vc = Point.mul(Point.add(Point.mul(mol1.v, mol1.m), Point.mul(mol2.v, mol2.m)), 1/(mol1.m + mol2.m));
-  var x = Point.sub(pos2, pos1);
-  var v1c = Point.sub(mol1.v, vc);
-  mol1.v = Point.sub(mol1.v, Point.mul(x, 2 * Point.dot(v1c, x)/Point.dot(x, x)));
-  var v2c = Point.sub(mol2.v, vc);
-  mol2.v = Point.sub(mol2.v, Point.mul(x, 2 * Point.dot(v2c, x)/Point.dot(x, x)));
+  var vc = Vec.mul(Vec.add(Vec.mul(mol1.v, mol1.m), Vec.mul(mol2.v, mol2.m)), 1/(mol1.m + mol2.m));
+  var x = Vec.sub(pos2, pos1);
+  var v1c = Vec.sub(mol1.v, vc);
+  mol1.v = Vec.sub(mol1.v, Vec.mul(x, 2 * Vec.dot(v1c, x)/Vec.dot(x, x)));
+  var v2c = Vec.sub(mol2.v, vc);
+  mol2.v = Vec.sub(mol2.v, Vec.mul(x, 2 * Vec.dot(v2c, x)/Vec.dot(x, x)));
   
   //console.log(pos1.x, pos1.y, pos2.x, pos2.y, vc.x, vc.y, x.x, x.y, 
   //  mol1.v.x, mol1.v.y, mol2.v.x, mol2.v.y);
@@ -299,7 +299,7 @@ function calcStats(arr) {
   var stats = {vMax: 0, vMin: Infinity, vAvg: 0, Esum: 0, RMS: 0};
   var len = arr.length;
   while (len--) {
-    var v2 = Point.dot(arr[len].v, arr[len].v);
+    var v2 = Vec.dot(arr[len].v, arr[len].v);
     var v = Math.sqrt(v2);
     if (v > stats.vMax) {
       stats.vMax = v;

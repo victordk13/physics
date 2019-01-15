@@ -42,8 +42,9 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 0;
-var N = 350;
+var epsilon = 1.e-6;
+var g = 2;
+var N = 2;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
 var molecules = [];
@@ -116,6 +117,8 @@ function init() {
             Math.random() * (box.h - 2 * mol.rad) + mol.rad);
         } while (i>0 && Vec.distanceSq(mol.pos, molecules[0].pos) < 
           (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
+          
+        //mol.pos = new Vec(30 + i * 40, 50);
         
         // same speed, random direction
         v = 10; // (initial) 1-frame displacement will be v/fps
@@ -123,6 +126,8 @@ function init() {
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
         mol.v = new Vec(v * Math.cos(th), v * Math.sin(th));
+        
+        //mol.v = new Vec(10 - i * 20, 0);
         
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.
@@ -197,8 +202,10 @@ function draw() {
 }
 
 // bounce and reflect molecules against walls
-// TODO: calculate the force/moment imparted by each molecule into the wall (calc. pressure) - must be m*(vx0 - vx1) (for vertical wall)
-function reflect(obj) {
+// TODO: calculate the force/moment imparted by each molecule into the wall (calc. pressure, move box, etc.)
+//       must be m*(vx0 - vx1) (e.g. for a vertical wall)
+// TODO: add collision processing for molecules outside the box (for future experiments) 
+function reflect(obj, box) {
   if (obj.pos.x <= box.l + obj.rad)
   {
     obj.pos.x = 2 * (box.l + obj.rad) - obj.pos.x;
@@ -226,6 +233,38 @@ function reflect(obj) {
   }
 }
 
+// ax^2+bx+c=0
+function solveQuad(a, b, c) {
+    var D = b * b - 4 * a * c;
+    if (D < 0)
+      return [-Infinity, -Infinity];
+    var d = Math.sqrt(d);
+    var result1 = (-b - d) / (2 * a);
+    var result2 = (-b + d) / (2 * a);
+    return [result1, result2];
+}
+
+function reflectionTime(obj, box) {
+  var nearest = Infinity;
+  var results = [];
+  if(g) {
+    var res = solveQuad(g/2, obj.v.y, obj.pos.y - box.t);
+    results.push(res[0], res[1]);
+    res = solveQuad(g/2, obj.v.y, obj.pos.y - box.b);
+    results.push(res[0], res[1]);
+  } else {
+    results.push((box.t - obj.pos.y) / obj.v.y);
+    results.push((box.b - obj.pos.y) / obj.v.y);
+  }
+  results.push((box.l - obj.pos.x) / obj.v.x);
+  results.push((box.r - obj.pos.x) / obj.v.x);
+  results.forEach(function(t) {
+    if (t >= 0 && t < nearest)
+      nearest = t;
+  });
+  return nearest;
+}
+
 function collisionTime(mol1, mol2) {
   var v = Vec.sub(mol1.v, mol2.v);
   var x = Vec.sub(mol2.pos, mol1.pos);
@@ -233,12 +272,12 @@ function collisionTime(mol1, mol2) {
   
   var t = Vec.dot(x,v)/vsq;
   if (t < 0)
-    return -Infinity;
+    return -Infinity; // don't care about collisions in the past
   var min = (x.x - t*v.x)*(x.x - t*v.x) + (x.y - t*v.y)*(x.y - t*v.y);
   var Rsq = (mol1.rad + mol2.rad) * (mol1.rad + mol2.rad);
   if (min > Rsq)
-    return -Infinity;
-  // collision is some time before (would be) minimum distance
+    return -Infinity; // it's a miss
+  // collision is not at a minimum distance, but some time before (at r1+r2 distance between balls' centers)
   // TODO: use approximate value instead of Math.sqrt()?
   delta = Math.sqrt((Rsq - min) / vsq);
   return t - delta;
@@ -282,17 +321,43 @@ function stupidCollisions(mol, index, dur) {
 }
 
 function move(dur) {
-  box.l += box.v[0];
-  box.t += box.v[1];
-  box.r += box.v[2];
-  box.b += box.v[3];
+  // TODO: we calculate future collisions on each tick; should rather keep a list and update it
+  var collisions = [];
+  // create a list of nearest collisions
+  // let's process reflections at initial position (to simplify things)
   molecules.forEach(function(mol, index) {
-    stupidCollisions(mol, index, dur);
-    reflect(mol);
+    var t = reflectionTime(mol, box);
+    if (isFinite(t) && dur >= t)
+      collisions.push([index, -1, t]);
+    molecules.forEach(function(mol2, index2) {
+      var t = collisionTime(mol, mol2);
+      if (isFinite(t) && dur >= t)
+        collisions.push([index, index2, t]);
+    });
+    
+    /* TODO: MOVE stupidCollisions(mol, index, dur);
     mol.pos.x += mol.v.x * dur;
     mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
     mol.v.y += g * dur;
+    reflect(mol, box);*/
   });
+  collisions.sort(function(a, b) {
+    return a[2] - b[2]; // sort by time
+  });
+  // TODO: now go through the list, advance the state and then process collisions
+  // As we process each collision exactly at its time, there should be no E fluctuations in g field (due to incorrect particle positions)
+  collisions.forEach(function(col) {
+    // 0. advance the state by col[2] (=t)
+    // 1. collide or reflect particle(s)
+    // 2. calculate new nearest collision&reflection for the colliding particle(s)
+    // 3. insert in collisions array - this means forEach is not suitable
+  });
+  
+  // move the box to a next position (might be some overlap, but it won't be a bother if we keep box speeds low)
+  box.l += box.v[0] * dur;
+  box.t += box.v[1] * dur;
+  box.r += box.v[2] * dur;
+  box.b += box.v[3] * dur;
 }
 
 function calcStats(arr) {

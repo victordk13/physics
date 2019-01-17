@@ -244,20 +244,25 @@ function collisionTime(mol1, mol2) {
   return t - delta;
 }
 
+function advance(mol, time) {
+    mol.pos.x += mol.v.x * time;
+    mol.pos.y += mol.v.y * time + g * time * time / 2;
+    mol.v.y += g * time;
+}
+
 // time of collision to avoid calculating twice
 function collide(mol1, mol2, time) {
   //console.log(
   //  mol1.pos.x, mol1.pos.y, mol1.v.x, mol1.v.y, 
   //  mol2.pos.x, mol2.pos.y, mol2.v.x, mol2.v.y, time);
     
-  var pos1 = Vec.add(mol1.pos, Vec.mul(mol1.v, time));
-  var pos2 = Vec.add(mol2.pos, Vec.mul(mol2.v, time));
-  
-  mol1.pos = pos1;
-  mol2.pos = pos2;
-  // (m1*v1 + m2*v2) / (m1 + m2)
+  advance(mol1, time);
+  advance(mol2, time);
+
+  // vc = (m1*v1 + m2*v2) / (m1 + m2)
   var vc = Vec.mul(Vec.add(Vec.mul(mol1.v, mol1.m), Vec.mul(mol2.v, mol2.m)), 1/(mol1.m + mol2.m));
-  var x = Vec.sub(pos2, pos1);
+  // other magic
+  var x = Vec.sub(mol2.pos, mol1.pos);
   var v1c = Vec.sub(mol1.v, vc);
   mol1.v = Vec.sub(mol1.v, Vec.mul(x, 2 * Vec.dot(v1c, x)/Vec.dot(x, x)));
   var v2c = Vec.sub(mol2.v, vc);
@@ -268,13 +273,13 @@ function collide(mol1, mol2, time) {
 }
 
 function stupidCollisions(mol, index, dur) {
-  var collided = false;
+  var collided = 0;
   molecules.forEach(function(mol2, index2) {
     if (index != index2) {
       var t = collisionTime(mol, mol2);
       if (isFinite(t) && dur >= t) {
         collide(mol, mol2, t);
-        collided = true;
+        collided = t;
       }
     }
   });
@@ -287,11 +292,9 @@ function move(dur) {
   box.r += box.v[2];
   box.b += box.v[3];
   molecules.forEach(function(mol, index) {
-    stupidCollisions(mol, index, dur);
+    var left = dur - stupidCollisions(mol, index, dur);
     reflect(mol);
-    mol.pos.x += mol.v.x * dur;
-    mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
-    mol.v.y += g * dur;
+    advance(mol, left);
   });
 }
 

@@ -266,13 +266,14 @@ function reflectionTime(obj, box) {
 }
 
 function collisionTime(mol1, mol2) {
+  // first calculate an approach time (nearest distance between moving center points)
   var v = Vec.sub(mol1.v, mol2.v);
   var x = Vec.sub(mol2.pos, mol1.pos);
   var vsq = Vec.dot(v,v);
   
   var t = Vec.dot(x,v)/vsq;
   if (t < 0)
-    return -Infinity; // don't care about collisions in the past
+    return -Infinity; // don't care about past approaches
   var min = (x.x - t*v.x)*(x.x - t*v.x) + (x.y - t*v.y)*(x.y - t*v.y);
   var Rsq = (mol1.rad + mol2.rad) * (mol1.rad + mol2.rad);
   if (min > Rsq)
@@ -283,12 +284,13 @@ function collisionTime(mol1, mol2) {
   return t - delta;
 }
 
-// time of collision to avoid calculating twice
+// pass time of collision to avoid calculating twice
 function collide(mol1, mol2, time) {
   //console.log(
   //  mol1.pos.x, mol1.pos.y, mol1.v.x, mol1.v.y, 
   //  mol2.pos.x, mol2.pos.y, mol2.v.x, mol2.v.y, time);
-    
+  
+  // TODO: maybe, take account of gravity here, instead of new convoluted processing
   var pos1 = Vec.add(mol1.pos, Vec.mul(mol1.v, time));
   var pos2 = Vec.add(mol2.pos, Vec.mul(mol2.v, time));
   
@@ -320,38 +322,92 @@ function stupidCollisions(mol, index, dur) {
   return collided;
 }
 
+function moveNoCollisions(dur) {
+  molecules.forEach(function(mol, index) {
+    mol.pos.x += mol.v.x * dur;
+    mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
+    mol.v.y += g * dur;    
+  });
+}
+
+function indexSorted(array, value, less) {
+  var low = 0,
+    high = array.length;
+
+  while (low < high) {
+    var mid = (low + high) >>> 1;
+    if (less(array[mid], value)) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+function insertSorted(array, value, less) {
+  collisions.splice(indexSorted(array, value, less), 0, value);
+}
+
+function updateCollisions(collisions, mol, dur, curTime) {
+  if (dur < 0)
+    return;
+  var t = reflectionTime(mol, box) + curTime;
+  if (isFinite(t) && dur >= t) {
+    insertSorted(collisions, [index, -1, t], function(a, b) { return a[2] - b[2]; });
+  }
+  molecules.forEach(function(mol2, index2) {
+    if (index2 <= index)
+      return;
+    var t = collisionTime(mol, mol2) + curTime;
+    if (isFinite(t) && dur >= t)
+      insertSorted(collisions, [index, index2, t], function(a, b) { return a[2] - b[2]; });
+  });
+  return collisions;
+}
+
 function move(dur) {
   // TODO: we calculate future collisions on each tick; should rather keep a list and update it
   var collisions = [];
-  // create a list of nearest collisions
+  // create a list of nearest collisions (within move duration)
   // let's process reflections at initial position (to simplify things)
   molecules.forEach(function(mol, index) {
     var t = reflectionTime(mol, box);
     if (isFinite(t) && dur >= t)
       collisions.push([index, -1, t]);
     molecules.forEach(function(mol2, index2) {
+      if (index2 <= index)
+        return;
       var t = collisionTime(mol, mol2);
       if (isFinite(t) && dur >= t)
         collisions.push([index, index2, t]);
     });
     
-    /* TODO: MOVE stupidCollisions(mol, index, dur);
-    mol.pos.x += mol.v.x * dur;
-    mol.pos.y += mol.v.y * dur + g * dur * dur / 2;
-    mol.v.y += g * dur;
-    reflect(mol, box);*/
   });
   collisions.sort(function(a, b) {
     return a[2] - b[2]; // sort by time
   });
-  // TODO: now go through the list, advance the state and then process collisions
+  // Now go through the list, advance the state to a moment of each collision, then collide and update collisions list
   // As we process each collision exactly at its time, there should be no E fluctuations in g field (due to incorrect particle positions)
-  collisions.forEach(function(col) {
+  var curTime = 0;
+  while (curTime < dur && collisions.length > 0) {
+    var col = collisions.splice(0, 1)[0];
+    if (col[2] > dur)
+      break;
     // 0. advance the state by col[2] (=t)
+    moveNoCollisions(col[2] - curTime);
+    curTime = col[2];
     // 1. collide or reflect particle(s)
-    // 2. calculate new nearest collision&reflection for the colliding particle(s)
-    // 3. insert in collisions array - this means forEach is not suitable
-  });
+    if (col[1] == -1) {
+      reflect(molecules[col[0]], box);
+    }
+    else {
+      collide(molecules[col[0]], molecules[col[1]], 0);
+      // 2. calculate new nearest collision&reflection for the colliding particle(s)
+      // 3. insert in collisions array - this means forEach is not suitable
+      updateCollisions(collisions, molecules[col[1]], dur, curTime);
+    }
+    updateCollisions(collisions, molecules[col[0]], dur, curTime);
+  };
+  if (dur > curTime)
+    moveNoCollisions(dur - curTime);
   
   // move the box to a next position (might be some overlap, but it won't be a bother if we keep box speeds low)
   box.l += box.v[0] * dur;

@@ -42,8 +42,8 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 0;
-var N = 350;
+var g = 2;
+var N = 500;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
 var molecules = [];
@@ -98,7 +98,7 @@ function init() {
 
         // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
         mol.m = 1;
-        mol.rad = 0.3;
+        mol.rad = 0.2;
         
         if (i==0) {
           mol.m = 38;
@@ -274,15 +274,15 @@ function collide(mol1, mol2, time) {
 
 function stupidCollisions(mol, index, dur) {
   var collided = 0;
-  molecules.forEach(function(mol2, index2) {
-    if (index != index2) {
-      var t = collisionTime(mol, mol2);
+  for(var i2 = index + 1; i2 < molecules.length; i2++) {
+    if (index < i2) {
+      var t = collisionTime(mol, molecules[i2]);
       if (isFinite(t) && dur >= t) {
-        collide(mol, mol2, t);
+        collide(mol, molecules[i2], t);
         collided = t;
       }
     }
-  });
+  }
   return collided;
 }
 

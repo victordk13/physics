@@ -98,10 +98,10 @@ function init() {
 
         // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
         mol.m = 1;
-        mol.rad = 0.2;
+        mol.rad = 0.25;
         
         if (i==0) {
-          mol.m = 38;
+          mol.m = 50;
           mol.rad = 18;
           const bbv = Math.PI * mol.rad * mol.rad;
           console.log("Big ball density = " + (mol.m / bbv));
@@ -118,7 +118,7 @@ function init() {
           (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
         
         // same speed, random direction
-        v = 10; // (initial) 1-frame displacement will be v/fps
+        v = 7; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
@@ -196,34 +196,49 @@ function draw() {
   });
 }
 
+// [inout] obj - object {pos:, v:, rad:} to be reflected
+// passed coordinates/speeds/g should be recalculated relative to a given wall - 
+// oriented so that an object is colliding with the wall from up down
+// (e.g. no recalculation for bottom wall, all parameters passed as is, g > 0).
+function reflectWall(obj, wx, wv, g, dur) {
+  // taking g into account, we conserve E
+  var pos = obj.pos + obj.v * dur + g * dur * dur / 2;
+  var v = obj.v + g * dur;
+  if (pos >= wx - obj.rad)
+  {
+    //console.log(obj, pos, v, wx, wv, g, dur);
+  
+    obj.pos = 2 * (wx - obj.rad) - pos;
+    // whenever and wherever the collision was, we can conserve E by taking a diff of kinetic E
+    var v2sq = v*v - 2*g*(pos - obj.pos);
+    obj.v = v2sq >= 0 ? Math.sqrt(v2sq) : v;
+    // obj.v may be oriented incorrectly, also we mustn't let obj go beyond wall or stick to it, so reflect the speed too
+    // this entire method is hacky, so whatever
+    if (obj.v - wv > 0)
+      obj.v = - obj.v + 2 * wv;
+    //console.log(obj, pos, v, wx, wv);
+  }  
+}
+
 // bounce and reflect molecules against walls
 // TODO: calculate the force/moment imparted by each molecule into the wall (calc. pressure) - must be m*(vx0 - vx1) (for vertical wall)
-function reflect(obj) {
-  if (obj.pos.x <= box.l + obj.rad)
-  {
-    obj.pos.x = 2 * (box.l + obj.rad) - obj.pos.x;
-    if (obj.v.x - box.v[0] < 0)
-      obj.v.x = - obj.v.x + 2 * box.v[0];
-  }
-  if (obj.pos.y <= box.t + obj.rad)
-  {
-    obj.pos.y = 2 * (box.t + obj.rad) - obj.pos.y;
-    if (obj.v.y - box.v[1] < 0)
-      obj.v.y = - obj.v.y + 2 * box.v[1];
-  }
+function reflect(mol, dur) {
+  var obj = {};
+  obj.pos = -mol.pos.x; obj.v = -mol.v.x; obj.rad = mol.rad;
+  reflectWall(obj, -box.l, -box.v[0], 0, dur);
+  mol.pos.x = -obj.pos; mol.v.x = -obj.v;
   
-  if (obj.pos.x >= box.r - obj.rad)
-  {
-    obj.pos.x = 2 * (box.r - obj.rad) - obj.pos.x;
-    if (obj.v.x - box.v[2] > 0)
-      obj.v.x = - obj.v.x + 2 * box.v[2];
-  }
-  if (obj.pos.y >= box.b - obj.rad)
-  {
-    obj.pos.y = 2 * (box.b - obj.rad) - obj.pos.y;
-    if (obj.v.y - box.v[3] > 0)
-      obj.v.y = - obj.v.y + 2 * box.v[3];
-  }
+  var obj = {pos:mol.pos.x, v:mol.v.x, rad:mol.rad};
+  reflectWall(obj, box.r, box.v[2], 0, dur);
+  mol.pos.x = obj.pos; mol.v.x = obj.v;
+
+  obj.pos = -mol.pos.y; obj.v = -mol.v.y; obj.rad = mol.rad;
+  reflectWall(obj, -box.t, -box.v[1], -g, dur);
+  mol.pos.y = -obj.pos; mol.v.y = -obj.v;
+
+  var obj = {pos:mol.pos.y, v:mol.v.y, rad:mol.rad};
+  reflectWall(obj, box.b, box.v[3], g, dur);
+  mol.pos.y = obj.pos; mol.v.y = obj.v;
 }
 
 function collisionTime(mol1, mol2) {
@@ -293,7 +308,7 @@ function move(dur) {
   box.b += box.v[3];
   molecules.forEach(function(mol, index) {
     var left = dur - stupidCollisions(mol, index, dur);
-    reflect(mol);
+    reflect(mol, left);
     advance(mol, left);
   });
 }

@@ -42,8 +42,8 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 2;
-var N = 500;
+var g = 1;
+var N = 400;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
 var molecules = [];
@@ -97,16 +97,16 @@ function init() {
         mol.shape = new createjs.Shape();
 
         // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
-        mol.m = 1;
-        mol.rad = 0.25;
+        mol.m = 1 + 10 * (i%2);
+        mol.rad = 0.2 + 0.2 * (i%2);
         
-        if (i==0) {
+        /*if (i==0) {
           mol.m = 50;
           mol.rad = 18;
           const bbv = Math.PI * mol.rad * mol.rad;
           console.log("Big ball density = " + (mol.m / bbv));
           console.log("Gas density = " + (1 * (N-1) / (box.w * box.h - bbv)));
-        }
+        }*/
 
         //mol.tx =  Math.random() * (box.w - 2) + 1;
         //mol.ty =  Math.random() * (box.h - 2) + 1;
@@ -123,6 +123,11 @@ function init() {
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
         mol.v = new Vec(v * Math.cos(th), v * Math.sin(th));
+        
+        mol.col = "rgb(" 
+          + Math.round(Math.random() * 96 + (i%2) * 160) + ","
+          + Math.round(Math.random() * 128 + 64) + ","
+          + Math.round(Math.random() * 96 + ((i+1)%2) * 160) + ")";
         
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.
@@ -179,10 +184,7 @@ function resize() {
     mol.shape.graphics
       .clear()
       .setStrokeStyle(1)
-      .beginStroke("rgb(" 
-        + Math.round(Math.random() * 255) + ","
-        + Math.round(Math.random() * 255) + ","
-        + Math.round(Math.random() * 255) + ")")
+      .beginStroke(mol.col)
       .drawCircle(0, 0, mol.draw_r);
   });
 }
@@ -224,19 +226,19 @@ function reflectWall(obj, wx, wv, g, dur) {
 // TODO: calculate the force/moment imparted by each molecule into the wall (calc. pressure) - must be m*(vx0 - vx1) (for vertical wall)
 function reflect(mol, dur) {
   var obj = {};
-  obj.pos = -mol.pos.x; obj.v = -mol.v.x; obj.rad = mol.rad;
+  obj = {pos:-mol.pos.x, v:-mol.v.x, rad:mol.rad};
   reflectWall(obj, -box.l, -box.v[0], 0, dur);
   mol.pos.x = -obj.pos; mol.v.x = -obj.v;
   
-  var obj = {pos:mol.pos.x, v:mol.v.x, rad:mol.rad};
+  obj = {pos:mol.pos.x, v:mol.v.x, rad:mol.rad};
   reflectWall(obj, box.r, box.v[2], 0, dur);
   mol.pos.x = obj.pos; mol.v.x = obj.v;
 
-  obj.pos = -mol.pos.y; obj.v = -mol.v.y; obj.rad = mol.rad;
+  obj = {pos:-mol.pos.y, v:-mol.v.y, rad:mol.rad};
   reflectWall(obj, -box.t, -box.v[1], -g, dur);
   mol.pos.y = -obj.pos; mol.v.y = -obj.v;
 
-  var obj = {pos:mol.pos.y, v:mol.v.y, rad:mol.rad};
+  obj = {pos:mol.pos.y, v:mol.v.y, rad:mol.rad};
   reflectWall(obj, box.b, box.v[3], g, dur);
   mol.pos.y = obj.pos; mol.v.y = obj.v;
 }

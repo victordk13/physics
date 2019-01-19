@@ -100,13 +100,19 @@ function init() {
         mol.m = 1 + 10 * (i%2);
         mol.rad = 0.2 + 0.2 * (i%2);
         
-        /*if (i==0) {
-          mol.m = 50;
+        mol.col = "rgb(" 
+          + Math.round(Math.random() * 96 + (i%2) * 160) + ","
+          + Math.round(Math.random() * 128 + 64) + ","
+          + Math.round(Math.random() * 96 + ((i+1)%2) * 160) + ")";
+          
+        if (i==0) {
+          mol.m = 40;
           mol.rad = 18;
           const bbv = Math.PI * mol.rad * mol.rad;
           console.log("Big ball density = " + (mol.m / bbv));
           console.log("Gas density = " + (1 * (N-1) / (box.w * box.h - bbv)));
-        }*/
+          mol.col = "#00ff00";
+        }
 
         //mol.tx =  Math.random() * (box.w - 2) + 1;
         //mol.ty =  Math.random() * (box.h - 2) + 1;
@@ -124,10 +130,6 @@ function init() {
         //mol.vy = v * Math.sin(th);
         mol.v = new Vec(v * Math.cos(th), v * Math.sin(th));
         
-        mol.col = "rgb(" 
-          + Math.round(Math.random() * 96 + (i%2) * 160) + ","
-          + Math.round(Math.random() * 128 + 64) + ","
-          + Math.round(Math.random() * 96 + ((i+1)%2) * 160) + ")";
         
         // turn snapToPixel on for all shapes - it's set to false by default on Shape.
         // it won't do anything until stage.snapToPixelEnabled is set to true.

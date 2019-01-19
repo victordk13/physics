@@ -106,12 +106,18 @@ function init() {
           + Math.round(Math.random() * 96 + ((i+1)%2) * 160) + ")";
           
         if (i==0) {
-          mol.m = 40;
+          mol.m = 200;
           mol.rad = 18;
-          const bbv = Math.PI * mol.rad * mol.rad;
-          console.log("Big ball density = " + (mol.m / bbv));
-          console.log("Gas density = " + (1 * (N-1) / (box.w * box.h - bbv)));
           mol.col = "#20df20";
+          const bbv = Math.PI * mol.rad * mol.rad;
+          var label = new createjs.Text("-- fps", "bold 18px Arial", "#000");
+          stage.addChild(label);
+          label.x = 10;
+          label.y = 50;
+          label.text = "Big ball density = " + (mol.m / bbv).toFixed(3) + 
+            "\nGas density = " + (5.5 * (N-1) / (box.w * box.h - bbv)).toFixed(3);
+          console.log("Big ball density = " + (mol.m / bbv));
+          console.log("Gas density = " + (5.5 * (N-1) / (box.w * box.h - bbv)));
         }
 
         //mol.tx =  Math.random() * (box.w - 2) + 1;

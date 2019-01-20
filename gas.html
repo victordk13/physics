@@ -42,7 +42,7 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 1;
+var g = 0.5;
 var N = 400;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
@@ -96,9 +96,10 @@ function init() {
         var mol = {};
         mol.shape = new createjs.Shape();
 
-        // all physical values in SI (m, s, etc.), even though they are bogus, all draw_* values in pixels
+        // all physical values in pseudo-SI (m, s, etc.), all draw_* values in pixels
         mol.m = 1 + 10 * (i%2);
-        mol.rad = 0.2 + 0.2 * (i%2);
+        mol.rad = 0.2 + 0.1 * (i%2);
+        mol.type = (i%2);
         
         mol.col = "rgb(" 
           + Math.round(Math.random() * 96 + (i%2) * 160) + ","
@@ -106,6 +107,7 @@ function init() {
           + Math.round(Math.random() * 96 + ((i+1)%2) * 160) + ")";
           
         if (i==0) {
+          mol.type = 2;
           mol.m = 200;
           mol.rad = 18;
           mol.col = "#20df20";
@@ -113,7 +115,7 @@ function init() {
           var label = new createjs.Text("-- fps", "bold 18px Arial", "#000");
           stage.addChild(label);
           label.x = 10;
-          label.y = 50;
+          label.y = 70;
           label.text = "Big ball density = " + (mol.m / bbv).toFixed(3) + 
             "\nGas density = " + (5.5 * (N-1) / (box.w * box.h - bbv)).toFixed(3);
           console.log("Big ball density = " + (mol.m / bbv));
@@ -130,7 +132,7 @@ function init() {
           (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
         
         // same speed, random direction
-        v = 7; // (initial) 1-frame displacement will be v/fps
+        v = 4; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);
@@ -324,7 +326,7 @@ function move(dur) {
 }
 
 function calcStats(arr) {
-  var stats = {vMax: 0, vMin: Infinity, vAvg: 0, Esum: 0, RMS: 0};
+  var stats = {vMax: 0, vMin: Infinity, Esum: 0, vAvg: 0, RMS: 0, perType:[]};
   var len = arr.length;
   while (len--) {
     var v2 = Vec.dot(arr[len].v, arr[len].v);
@@ -338,9 +340,20 @@ function calcStats(arr) {
     stats.vAvg += v;
     stats.Esum += arr[len].m*v2/2 - arr[len].m*arr[len].pos.y*g;
     stats.RMS += v2;
+    
+    var type = arr[len].type;
+    while (type >= stats.perType.length)
+      stats.perType.push({vAvg: 0, RMS: 0, num: 0});
+    stats.perType[type].vAvg += v;
+    stats.perType[type].RMS += v2;
+    ++stats.perType[type].num;
   }
   stats.vAvg /= arr.length;
   stats.RMS = Math.sqrt(stats.RMS / arr.length);
+  stats.perType.forEach(function(type) {
+    type.vAvg /= type.num;
+    type.RMS = Math.sqrt(type.RMS / type.num);
+  });
   return stats;
 }
 
@@ -358,7 +371,8 @@ function tick(event) {
     draw();
     stats = calcStats(molecules);
     
-    fpsLabel.text = Math.round(1. / dur) + " fps, RMS = " + stats.RMS.toFixed(2) + ", E = " + stats.Esum.toFixed(2);
+    fpsLabel.text = Math.round(1. / dur) + " fps, E = " + stats.Esum.toFixed(2) +
+      "\nRMS1 = " + stats.perType[0].RMS.toFixed(2) + ", RMS2 = " + stats.perType[1].RMS.toFixed(2);
 
     // draw the updates to stage:
     stage.update(event);

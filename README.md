@@ -1,4 +1,4 @@
-# Physics
+# Simple physics simulations
 ## [Double pendulum](https://victordk13.github.io/physics/double_pendulum.html)
 
 [What is it anyway?](https://en.wikipedia.org/wiki/Double_pendulum)

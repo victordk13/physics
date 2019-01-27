@@ -42,7 +42,7 @@ var canvas;
 var stage;
 var paused = false;
 
-var g = 0.5;
+var g = 1;
 var N = 400;
 var box = {w: 100, h: 100, l: 0, t: 0, r: 100, b: 100, v: [0, 0, 0, 0]};
 var stats = {};
@@ -132,7 +132,7 @@ function init() {
           (mol.rad + molecules[0].rad)*(mol.rad + molecules[0].rad));
         
         // same speed, random direction
-        v = 4; // (initial) 1-frame displacement will be v/fps
+        v = 0; // (initial) 1-frame displacement will be v/fps
         th = 2 * Math.PI * Math.random();
         //mol.vx = v * Math.cos(th);
         //mol.vy = v * Math.sin(th);

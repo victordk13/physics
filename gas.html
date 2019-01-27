@@ -302,13 +302,17 @@ function collide(mol1, mol2, time) {
 function stupidCollisions(mol, index, dur) {
   var collided = 0;
   for(var i2 = index + 1; i2 < molecules.length; i2++) {
-    if (index < i2) {
-      var t = collisionTime(mol, molecules[i2]);
+    var mol2 = molecules[i2];
+    if (Math.abs(mol2.v.y - mol.v.y) * dur > Math.abs(mol2.pos.y - mol.pos.y) - mol2.rad - mol.rad &&
+        Math.abs(mol2.v.x - mol.v.x) * dur > Math.abs(mol2.pos.x - mol.pos.x) - mol2.rad - mol.rad) {
+      var t = collisionTime(mol, mol2);
       if (isFinite(t) && dur >= t) {
-        collide(mol, molecules[i2], t);
+        collide(mol, mol2, t);
         collided = t;
       }
     }
+    if ((mol.v.y + stats.vMax) * dur < (mol2.pos.y - mol.pos.y) - mol2.rad - mol.rad)
+      break;
   }
   return collided;
 }
@@ -323,6 +327,7 @@ function move(dur) {
     reflect(mol, left);
     advance(mol, left);
   });
+  molecules.sort((a, b) => b.pos.y - a.pos.y);
 }
 
 function calcStats(arr) {

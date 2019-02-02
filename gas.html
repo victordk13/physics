@@ -31,10 +31,10 @@
 
   </head>
   <body onload="init();">
-    <div class="controls">
+    <!--cache is worse: div class="controls">
       <input type="checkbox" onClick="toggleCache(this.checked);" id="toggleCache"/>
       <label for="toggleCache">cache enabled</label>
-    </div>
+    </div-->
     <canvas id="boxCanvas" width="1280" height="720">Your browser doesn't support "canvas".</canvas>
     
 <script>
@@ -168,12 +168,12 @@ function init() {
 }
 
 function translateX(x) {
-  var bs = Math.min(canvas.width, canvas.height);
+  var bs = Math.min(canvas.width - 2, canvas.height - 2);
   return (canvas.width - bs) / 2 + x * bs / box.w;
 }
 
 function translateY(y) {
-  var bs = Math.min(canvas.width, canvas.height);
+  var bs = Math.min(canvas.width - 2, canvas.height - 2);
   return (canvas.height - bs) / 2 + y * bs / box.h;
 }
 
@@ -187,7 +187,7 @@ function resize() {
     .clear()
     .setStrokeStyle(1)
     .beginStroke("#000")
-    .drawRect(0, 0, translateX(box.r) - translateX(box.l), translateY(box.b) - translateY(box.t));
+    .drawRect(1, 1, translateX(box.r) - translateX(box.l) - 2, translateY(box.b) - translateY(box.t) - 2);
   
   molecules.forEach(function(mol) {
     mol.draw_r = mol.rad * bs / box.w;
@@ -400,8 +400,8 @@ function toggleCache(value) {
 function resizeCanvas() {
   var rect = canvas.getBoundingClientRect();
 
-  canvas.width = window.innerWidth - 20;
-  canvas.height = window.innerHeight - rect.top - 20;
+  canvas.width = window.innerWidth - rect.left;
+  canvas.height = window.innerHeight - rect.top;
   resize();
 }
 
